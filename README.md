@@ -46,3 +46,15 @@ git push
   <li>opt: 优化代码（例：opt: 优化角色逻辑）</li>
   <li>doc: 修改说明文档</li>
 </ul>
+
+<hr>
+
+<h2>五、项目文件夹结构规范</h2>
+<ul>
+  <li>Art/Models：存放模型文件</li>
+  <li>Art/Prefabs：存放预制体文件</li>
+  <li>Art/ImportAssets：存放导入的第三方资源</li>
+  <li>Art/Animations：存放所有动画文件</li>
+  <li>Scripts：存放所有 C# 脚本，按功能分类新建子文件夹</li>
+  <li>Scene：存放场景文件</li>
+</ul>
