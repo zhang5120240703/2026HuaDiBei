@@ -1,5 +1,12 @@
 <h1>使用规范</h1>
 
+<h2>⚠️ 最重要规则（必看）</h2>
+<ul>
+  <li>负责 Python 的人 <strong>只允许修改 Python/ 文件夹</strong>，不要动任何 Unity 文件</li>
+  <li>负责 Unity 的人 <strong>只允许修改 Unity 项目文件</strong>，不要动 Python/ 文件夹</li>
+  <li>每次提交写清楚本次提交修改的内容，不要写一堆什么111aaaa的乱码上来</li>
+  <li>双方互不干扰，绝对不会冲突、不会覆盖！</li>
+</ul>
 <p style="color:red; font-size:16px; font-weight:bold;">【特别重要】禁止多人同时编辑同一场景文件！
 在修改任意场景前，务必先拉取最新代码并与队友沟通同步，否则极易造成场景冲突、内容丢失或损坏，且难以修复。</p>
 
