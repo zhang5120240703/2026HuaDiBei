@@ -1,4 +1,4 @@
-// 实验步骤枚举
+﻿// 实验步骤枚举
 public enum ExperimentStep
 {
     Step1_Prepare,    // 准备阶段
@@ -20,11 +20,11 @@ public enum ExperimentRunState
 // 用户操作类型（所有可捕捉的操作）
 public enum UserActionType
 {
-    StartExperiment,
-    PauseExperiment,
-    ResetExperiment,
-    JumpToNextStep,
-    JumpToPrevStep,
-    ModifyParameter,
-    ConfirmParam
+    StartExperiment,//0
+    PauseExperiment,//1
+    ResetExperiment,//2
+    JumpToNextStep,//3
+    JumpToPrevStep,//4
+    ModifyParameter,//5
+    ConfirmParam//6
 }
