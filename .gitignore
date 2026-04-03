@@ -10,7 +10,8 @@ Temp/
 .vs/
 ./Library/
 ./UserSettings/
-
+# .NET 自动生成的工具目录（一定要加）
+.dotnet/
 
 
 
