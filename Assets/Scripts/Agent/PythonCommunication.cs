@@ -169,22 +169,26 @@ public class PythonCommunication : MonoBehaviour
                 return;
         }
 
-        ApplyNextState(response.nextState);
+        if (!ApplyNextState(response.nextState))
+        {
+            return;
+        }
+
         ApplyNextStep(response.nextStep);
     }
 
     // 将 Python 返回的 nextState 字符串解析为本地枚举，并在合法时更新当前状态。
-    private void ApplyNextState(string nextState)
+    private bool ApplyNextState(string nextState)
     {
         if (string.IsNullOrWhiteSpace(nextState))
         {
-            return;
+            return true;
         }
 
         if (!Enum.TryParse(nextState, out State parsedState))
         {
             Debug.LogWarning("Unknown nextState: " + nextState, this);
-            return;
+            return false;
         }
 
         if (gameState != parsedState)
@@ -192,6 +196,8 @@ public class PythonCommunication : MonoBehaviour
             Debug.Log($"State change: {gameState} -> {parsedState}", this);
             gameState = parsedState;
         }
+
+        return true;
     }
 
     private void ApplyNextStep(string nextStep)
