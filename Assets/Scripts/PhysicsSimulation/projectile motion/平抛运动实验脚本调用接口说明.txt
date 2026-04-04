@@ -1,0 +1,82 @@
+如果有错误或者缺少的功能，请联系我修改
+
+
+本项目的逻辑架构由三个静态或单例模块组成，每个模块职责分明，互不越界，通过定义良好的接口进行通信。
+
+一般就关注第2个和第3个，第3个里面有各种方法逐步推动小球运动以完成实验，有交互逻辑调用，第2个向外传递实验过程中的所有参数，有UI和AI模块调用，目前还没有很完善，等待补充。
+
+
+### PhysicsSimulationCore
+物理计算纯工具类，负责计算三维抛体轨迹点序列。
+
+核心方法是 `static List<Vector3> SimulateProjectileMotion(...)`
+作用是计算抛体运动三维轨迹点，落地规则为物体落到全局坐标 y <= GroundY（默认0）时视为触地并停止计算，输出按时间顺序排列的世界坐标Vector3列表。
+
+快捷方法有 ClassicProjectile()、OptimalAngleProjectile()、CustomProjectile()，提供了带默认参数的快速调用。
+
+关键参数：
+initialVelocity（初始速度，单位m/s，必须>0）
+launchAngle（发射仰角，单位度，0°为平抛）
+launchDirection（世界空间方向向量，其XZ分量决定水平运动方向）
+startPosition（发射起点世界坐标，y坐标必须大于设定的地面高度GroundY）
+timeStep（计算步长，单位秒，必须>0，必须与动画侧的animationTimeStep严格相等）
+totalTime（总模拟时间，单位秒，必须>0）
+GroundY（静态字段，全局地面高度，默认0，可通过SetGroundHeight方法临时调整）
+
+
+### SimulationDataBuffer
+全局唯一的数据缓存区，连接计算与表现。
+
+核心接口：
+写入入口 `static void UpdateTrajectoryData(List<Vector3> newPoints, ...)`
+这是唯一的写入入口，只有调用此法，小球和UI才能获取到新数据。
+
+读取前检查 `static bool HasValidData()`
+在读取数据前务必调用此方法检查数据是否有效。
+
+读取出口 `static List<Vector3> CurrentTrajectoryPoints`
+这是读取当前最新轨迹数据的唯一入口，为null或空表示无有效数据，需在HasValidData()返回true后使用。
+
+附加信息 LastLaunchParams
+自动保存最近一次发射的参数快照。
+
+清空方法 ClearData()
+
+
+### ProjectileBallController
+视觉表现模块，驱动小球动画、绘制轨迹线。
+
+核心方法：
+`public void PlayAnimation()`
+作用是开始播放动画，自动从SimulationDataBuffer读取数据并驱动小球移动、绘制轨迹线。
+
+`public void PauseAnimation() / ResumeAnimation()`
+作用是暂停/恢复动画播放。
+
+`public void ResetBall()`
+作用是将小球复位到初始位置，并清空已绘制的轨迹线。
+
+关键配置参数可在Inspector中调整，直接影响表现：
+同步参数 animationTimeStep（必须与PhysicsSimulationCore计算时使用的timeStep保持一致，否则动画卡顿）
+
+可调表现参数：
+playbackSpeed（动画播放速度倍率，1为原速，范围0.1-10，策划/设计师可通过此参数直观控制动画快慢）
+autoPlayOnStep3（若为true，进入实验第三步时自动播放动画，实现流程自动化）
+playLandingBounce（落地时是否播放弹跳视觉效果）
+
+轨迹线参数：
+包括 trailWidth（宽度）、trailStartColor（起点颜色）、trailEndColor（终点颜色）等
+
+
+### 注意事项
+
+数据流单向不可逆，需按 PhysicsSimulationCore 计算 → SimulationDataBuffer 缓存 → ProjectileBallController 消费的顺序调用。
+
+读取 CurrentTrajectoryPoints 前，务必先调用 HasValidData() 进行防御性检查。
+
+PhysicsSimulationCore 的 timeStep 与 ProjectileBallController 的 animationTimeStep 必须设置为同一个值，这是动画流畅的基础。
+
+调用 PhysicsSimulationCore.SimulateProjectileMotion 时，传入的参数必须满足以下条件，否则函数将返回空列表并输出警告：
+initialVelocity > 0
+startPosition.y > GroundY（默认地面高度为0，可通过SetGroundHeight方法临时调整）
+timeStep > 0 且 totalTime > 0
