@@ -243,6 +243,7 @@ def call_your_model_api(prompt:str)->str:
                 "content":(
                     "你只能返回JSON,不要返回解释，不要返回markdown代码块"
                     "你必须只从用户给出的 allowed actions 里选择 action"
+                    "再给我一段你的自我介绍，限制在30个字以内，放在reply的最前面"
                     "输出格式必须是："
                     "{\"action\":\"NoAction\",\"reply\":\"...\"}"
                 ),
