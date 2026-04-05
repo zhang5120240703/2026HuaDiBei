@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class IdealGasSimulation : MonoBehaviour
 {
@@ -57,13 +57,13 @@ public class IdealGasSimulation : MonoBehaviour
         // 记录当前值作为固定值
         switch (process)
         {
-            case ProcessType.Isothermal:
+            case ProcessType.Isothermal:// 等温过程：温度固定
                 fixedValue = temperature;
                 break;
-            case ProcessType.Isobaric:
+            case ProcessType.Isobaric:// 等压过程：压力固定
                 fixedValue = pressure;
                 break;
-            case ProcessType.Isochoric:
+            case ProcessType.Isochoric:// 等容过程：体积固定
                 fixedValue = volume;
                 break;
         }

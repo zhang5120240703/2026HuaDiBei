@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class UIPanel : MonoBehaviour
 {
@@ -8,18 +9,18 @@ public class UIPanel : MonoBehaviour
     public DataCollector dataCollector;
     
     // UI元素
-    public Text pressureText;
-    public Text volumeText;
-    public Text temperatureText;
-    public Text pvProductText;
-    public InputField temperatureInput;
+    public TextMeshPro pressureText;
+    public TextMeshPro volumeText;
+    public TextMeshPro temperatureText;
+    public TextMeshPro pvProductText;
+    public TMP_InputField temperatureInput;
     public Button isothermalButton;
     public Button isobaricButton;
     public Button isochoricButton;
-    public Text processText;
-    public Text statusText;
-    public Text progressText;
-    public Text errorText;
+    public TextMeshPro processText;
+    public TextMeshPro statusText;
+    public TextMeshPro progressText;
+    public TextMeshPro errorText;
     public Button startButton;
     public Button resetButton;
     public Button backButton;
