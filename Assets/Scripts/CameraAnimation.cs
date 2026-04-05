@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class CameraAnimation : MonoBehaviour
 {
@@ -12,11 +14,11 @@ public class CameraAnimation : MonoBehaviour
 
     private void Start()
     {
-        StartCoroutine(Test(2f));
+        StartCoroutine(CameraMove(2f));
     }
 
 
-    private IEnumerator Test(float doration)
+    private IEnumerator CameraMove(float doration)
     {
         Vector3 target = TargetTransform.position;
         Vector3 start = StartTransform.position;
