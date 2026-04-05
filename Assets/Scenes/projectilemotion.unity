@@ -969,16 +969,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animationTimeStep: 0.02
   playbackSpeed: 1
-  trailWidth: 0.1
-  trailStartColor: {r: 1, g: 0, b: 0.17031813, a: 1}
-  trailEndColor: {r: 1, g: 0, b: 0.009747028, a: 0}
+  trailWidth: 0.05
+  trailStartColor: {r: 0, g: 1, b: 1, a: 1}
+  trailEndColor: {r: 0, g: 1, b: 1, a: 0}
   autoPlayOnStep3: 1
-  playLandingBounce: 0
+  playLandingBounce: 1
   landingSound: {fileID: 8300000, guid: f5b1d45d0319f2948ac44b744ec66fa8, type: 3}
   soundVolume: 0.6
-  heightScrollStep: 0.1
-  minHeight: 0.1
-  maxHeight: 20
 --- !u!82 &2142559858
 AudioSource:
   m_ObjectHideFlags: 0
