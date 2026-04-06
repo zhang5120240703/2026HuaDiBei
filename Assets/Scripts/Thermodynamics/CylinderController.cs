@@ -1,11 +1,11 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
     public Transform piston; // 活塞的Transform组件
     public float cylinderHeight = 2.0f; // 气缸高度（对应2.0L体积）
-    public float minHeight = 0.5f; // 最小高度（对应0.5L体积）
+    public float minHeight = 0.0f; // 最小高度（对应0.0L体积）
     public float maxHeight = 2.0f; // 最大高度（对应2.0L体积）
     
     private float initialY; // 初始鼠标Y位置
@@ -38,7 +38,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             lastChangeTime = Time.time;
         }
     }
-    
+    #region 鼠标拖拽
     public void OnPointerDown(PointerEventData eventData)
     {
         isDragging = true;
@@ -56,8 +56,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             
             float newPistonY = initialPistonY + pistonDeltaY;
             // 限制活塞位置在气缸范围内
-            float minPistonY = minHeight - cylinderHeight;
-            float maxPistonY = 0.0f;
+            float minPistonY = -cylinderHeight / 2;
+            float maxPistonY = cylinderHeight/2;
             
             bool isOutOfRange = false;
             if (newPistonY < minPistonY)
@@ -84,7 +84,9 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     {
         isDragging = false;
     }
-    
+
+    #endregion
+
     private float GetCurrentVolume()
     {
         // 根据活塞位置计算体积
@@ -97,8 +99,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     {
         // 根据体积设置活塞位置
         float normalizedVolume = (volume - minHeight) / (maxHeight - minHeight);
-        float pistonHeight = normalizedVolume * cylinderHeight;
-        piston.localPosition = new Vector3(piston.localPosition.x, -pistonHeight, piston.localPosition.z);
+        float pistonHeight = normalizedVolume * cylinderHeight-cylinderHeight/2;
+        piston.localPosition = new Vector3(piston.localPosition.x, pistonHeight, piston.localPosition.z);
     }
     
     // 获取当前体积变化率

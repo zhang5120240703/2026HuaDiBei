@@ -9,18 +9,18 @@ public class UIPanel : MonoBehaviour
     public DataCollector dataCollector;
     
     // UI元素
-    public TextMeshPro pressureText;
-    public TextMeshPro volumeText;
-    public TextMeshPro temperatureText;
-    public TextMeshPro pvProductText;
+    public TMP_Text pressureText;
+    public TMP_Text volumeText;
+    public TMP_Text temperatureText;
+    public TMP_Text pvProductText;
     public TMP_InputField temperatureInput;
     public Button isothermalButton;
     public Button isobaricButton;
     public Button isochoricButton;
-    public TextMeshPro processText;
-    public TextMeshPro statusText;
-    public TextMeshPro progressText;
-    public TextMeshPro errorText;
+    public TMP_Text processText;
+    public TMP_Text statusText;
+    public TMP_Text progressText;
+    public TMP_Text errorText;
     public Button startButton;
     public Button resetButton;
     public Button backButton;
