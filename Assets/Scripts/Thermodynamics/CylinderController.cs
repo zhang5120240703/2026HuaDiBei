@@ -1,6 +1,9 @@
 ﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
+/// <summary>
+/// 气缸控制器，负责处理活塞的拖动和体积计算
+/// </summary>
 public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
     public Transform piston; // 活塞的Transform组件
@@ -14,7 +17,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     private float lastVolume; // 上一次记录的体积
     private float volumeChangeRate; // 体积变化率
     private float lastChangeTime; // 上一次变化时间
-    
+    private const float sensitivity = 0.001f; // 鼠标移动转换为活塞移动的灵敏度
     // 事件
     public System.Action<float> OnVolumeChanged;
     public System.Action<bool> OnVolumeRangeExceeded; // 当体积超出范围时触发
@@ -50,9 +53,9 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     {
         if (isDragging)
         {
-            float deltaY = Input.mousePosition.y - initialY;
+            float deltaY = eventData.position.y - initialY;
             // 将鼠标移动转换为活塞移动（调整灵敏度）
-            float pistonDeltaY = deltaY * 0.001f * cylinderHeight;
+            float pistonDeltaY = deltaY * sensitivity * cylinderHeight;
             
             float newPistonY = initialPistonY + pistonDeltaY;
             // 限制活塞位置在气缸范围内
@@ -89,18 +92,35 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
 
     private float GetCurrentVolume()
     {
-        // 根据活塞位置计算体积
-        float pistonHeight = Mathf.Abs(piston.localPosition.y);
-        float volume = (pistonHeight / cylinderHeight) * (maxHeight - minHeight) + minHeight;
-        return Mathf.Clamp(volume, minHeight, maxHeight);
+        //// 根据活塞位置计算体积
+        //float pistonHeight =piston.localPosition.y+1;
+        //float volume = cylinderHeight-(pistonHeight / cylinderHeight) * (maxHeight - minHeight) ;
+        //return Mathf.Clamp(volume, minHeight, maxHeight);
+
+        // 将活塞的Y位置归一化为[0, 1]范围
+        float normalizedPosition = Mathf.InverseLerp(-cylinderHeight / 2, cylinderHeight / 2, piston.localPosition.y);
+
+        // 将归一化的活塞位置映射到体积范围[minHeight, maxHeight]
+        float volume = Mathf.Lerp(maxHeight, minHeight,normalizedPosition);
+
+        return Mathf.Clamp(volume, minHeight, maxHeight); // 保证体积在有效范围内
     }
     
     public void SetPistonPosition(float volume)
     {
-        // 根据体积设置活塞位置
-        float normalizedVolume = (volume - minHeight) / (maxHeight - minHeight);
-        float pistonHeight = normalizedVolume * cylinderHeight-cylinderHeight/2;
-        piston.localPosition = new Vector3(piston.localPosition.x, pistonHeight, piston.localPosition.z);
+        //// 根据体积设置活塞位置
+        //float normalizedVolume = (volume - minHeight) / (maxHeight - minHeight);
+        //float pistonHeight = normalizedVolume * cylinderHeight-cylinderHeight/2;
+        //piston.localPosition = new Vector3(piston.localPosition.x, pistonHeight, piston.localPosition.z);
+
+        // 将体积映射到[0, 1]范围
+        float normalizedVolume = Mathf.InverseLerp(minHeight, maxHeight, volume);
+
+        // 将归一化的体积值映射到活塞的Y位置
+        float pistonY = Mathf.Lerp(cylinderHeight / 2, -cylinderHeight / 2, normalizedVolume);
+
+        // 设置活塞位置
+        piston.localPosition = new Vector3(piston.localPosition.x, pistonY, piston.localPosition.z);
     }
     
     // 获取当前体积变化率

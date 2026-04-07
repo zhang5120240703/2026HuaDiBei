@@ -63,7 +63,7 @@ public class UIPanel : MonoBehaviour
         // 更新数据显示
         pressureText.text = "压力: " + pressure.ToString("F2") + " kPa";
         volumeText.text = "体积: " + volume.ToString("F2") + " L";
-        temperatureText.text = "温度: " + temperature.ToString("F1") + " K";
+        temperatureText.text = "温度: " + temperature.ToString("F2") + " K";
         pvProductText.text = "PV乘积: " + (pressure * volume).ToString("F2") + " kPa·L";
         
         // 更新温度输入
@@ -167,11 +167,11 @@ public class UIPanel : MonoBehaviour
         
         if (verified)
         {
-            resultText += "✓ 成功验证了 " + lawName;
+            resultText += "成功验证了 " + lawName;
         }
         else
         {
-            resultText += "✗ 未能验证 " + lawName + "，误差超过3%";
+            resultText += "未能验证 " + lawName + "，误差超过3%";
         }
         
         statusText.text = resultText;

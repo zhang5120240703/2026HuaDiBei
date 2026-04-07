@@ -16,9 +16,9 @@ public class IdealGasSimulation : MonoBehaviour
     // 过程类型
     public enum ProcessType
     {
-        Isothermal, // 等温过程0
-        Isobaric, // 等压过程1
-        Isochoric // 等容过程2
+        Isothermal=0, // 等温过程0
+        Isobaric=1, // 等压过程1
+        Isochoric=2 // 等容过程2
     }
     
     public ProcessType currentProcess = ProcessType.Isothermal;
@@ -27,7 +27,7 @@ public class IdealGasSimulation : MonoBehaviour
     private float fixedValue;
     
     // 体积范围限制
-    private const float minVolume = 0.5f;
+    private const float minVolume = 0.0f;
     private const float maxVolume = 2.0f;
     
     // 温度范围限制

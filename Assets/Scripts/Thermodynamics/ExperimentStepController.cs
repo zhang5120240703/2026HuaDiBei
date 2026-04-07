@@ -18,8 +18,9 @@ public class ExperimentStepController : MonoBehaviour
         Conclusion // 结论总结
     }
     
-    private ExperimentStage currentStage = ExperimentStage.Preparation;
-    private float stageStartTime;
+
+    private ExperimentStage currentStage = ExperimentStage.Preparation;// 当前实验阶段
+    private float stageStartTime;// 当前阶段开始时间
     private const float stageTimeout = 60.0f; // 每个阶段的超时时间
     
     private void Start()
@@ -126,14 +127,14 @@ public class ExperimentStepController : MonoBehaviour
         // 可以添加超时处理逻辑，例如提示用户或自动进入下一阶段
     }
     
-    // 开始实验
+    // 开始实验(按钮调用)
     public void StartExperiment()
     {
         SetStage(ExperimentStage.DataCollection);
         uiManager.StartExperiment();
     }
-    
-    // 重置实验
+
+    // 重置实验(按钮调用)
     public void ResetExperiment()
     {
         SetStage(ExperimentStage.Preparation);
@@ -169,7 +170,7 @@ public class ExperimentStepController : MonoBehaviour
     
     // 获取当前阶段的操作指引
     public string GetStageInstruction()
-    {
+    {  
         switch (currentStage)
         {
             case ExperimentStage.Preparation:
