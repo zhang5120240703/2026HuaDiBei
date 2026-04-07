@@ -16,9 +16,9 @@ public class IdealGasSimulation : MonoBehaviour
     // 过程类型
     public enum ProcessType
     {
-        Isothermal, // 等温过程
-        Isobaric, // 等压过程
-        Isochoric // 等容过程
+        Isothermal, // 等温过程0
+        Isobaric, // 等压过程1
+        Isochoric // 等容过程2
     }
     
     public ProcessType currentProcess = ProcessType.Isothermal;

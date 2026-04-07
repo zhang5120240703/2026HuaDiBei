@@ -36,12 +36,12 @@ public class UIPanel : MonoBehaviour
         gasSimulation.OnStateChanged += UpdateStatusDisplay;
         dataCollector.OnDataCollected += UpdateDataDisplay;
         dataCollector.OnAnalysisCompleted += UpdateAnalysisDisplay;
-        
+
         // 初始化按钮事件
-        isothermalButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isothermal));
-        isobaricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isobaric));
-        isochoricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isochoric));
-        
+        //isothermalButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isothermal));
+        //isobaricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isobaric));
+        //isochoricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isochoric));
+
         // 温度输入事件
         temperatureInput.onValueChanged.AddListener(OnTemperatureInputChanged);
         
@@ -78,9 +78,9 @@ public class UIPanel : MonoBehaviour
         }
     }
     
-    private void SetProcess(IdealGasSimulation.ProcessType process)
+    public void SetProcess(int process)
     {
-        gasSimulation.SetProcess(process);
+        gasSimulation.SetProcess((IdealGasSimulation.ProcessType)process);
         UpdateProcessText();
         ResetExperiment();
     }
@@ -133,6 +133,7 @@ public class UIPanel : MonoBehaviour
         int dataCount = dataCollector.GetDataPointCount();
         statusText.text = "已采集 " + dataCount + " 个数据点，继续调整体积";
     }
+    
     
     public void UpdateAnalysisDisplay()
     {
