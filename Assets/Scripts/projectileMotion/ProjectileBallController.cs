@@ -20,7 +20,7 @@ using UnityEngine;
 [RequireComponent(typeof(AudioSource))] // 音效新增：自动挂载 AudioSource 组件
 public class ProjectileBallController : MonoBehaviour
 {
-    
+
 
     [Header("动画参数")]
     [Tooltip("每个轨迹点之间的等待时间（秒），应与 PhysicsSimulationCore 的 timeStep 保持一致")]
@@ -55,9 +55,9 @@ public class ProjectileBallController : MonoBehaviour
     [Range(0f, 1f)]
     public float soundVolume = 0.6f;
 
-    // ── 私有成员 ─────────────────────────────────────────────────────
 
-    private LineRenderer _lineRenderer;
+    // ── 私有成员 ─────────────────────────────────────────────────────
+    private LineRenderer _lineRenderer; 
     private Coroutine _animationCoroutine;
     private Vector3 _originPosition;     // 记录初始位置（用于重置归位）
 
@@ -68,6 +68,11 @@ public class ProjectileBallController : MonoBehaviour
 
     private bool _isPaused = false;
     private bool _isPlaying = false;
+
+    // GC优化：轨迹渐变色缓存
+    private Gradient _trailGradient;
+    private GradientColorKey[] _colorKeys = new GradientColorKey[2];
+    private GradientAlphaKey[] _alphaKeys = new GradientAlphaKey[2];
 
     // ── 生命周期 ─────────────────────────────────────────────────────
 
@@ -265,6 +270,8 @@ public class ProjectileBallController : MonoBehaviour
             _lineRenderer.SetPosition(i, points[i]);
 
         // 小球从第一个点出发
+        // ★ Bug1 Fix: 同步 _originPosition，确保 ResetBall 能回到物理起点而非场景摆放位置
+        _originPosition = points[0];
         transform.position = points[0];
 
         float waitTime = animationTimeStep / Mathf.Max(playbackSpeed, 0.01f);
@@ -298,8 +305,6 @@ public class ProjectileBallController : MonoBehaviour
     {
         _lineRenderer.startWidth = trailWidth;
         _lineRenderer.endWidth = trailWidth * 0.3f; // 末端细化
-        _lineRenderer.startColor = trailStartColor;
-        _lineRenderer.endColor = trailEndColor;
         _lineRenderer.useWorldSpace = true;
         _lineRenderer.positionCount = 0;
 
@@ -308,6 +313,21 @@ public class ProjectileBallController : MonoBehaviour
         {
             _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
         }
+
+        // 初始化渐变色
+        if (_trailGradient == null)
+        {
+            _trailGradient = new Gradient();
+            _colorKeys[0].color = trailStartColor;
+            _colorKeys[0].time = 0f;
+            _colorKeys[1].color = trailEndColor;
+            _colorKeys[1].time = 1f;
+            _alphaKeys[0].alpha = trailStartColor.a;
+            _alphaKeys[0].time = 0f;
+            _alphaKeys[1].alpha = trailEndColor.a;
+            _alphaKeys[1].time = 1f;
+            _trailGradient.SetKeys(_colorKeys, _alphaKeys);
+        }
     }
 
     /// <summary>
@@ -315,27 +335,25 @@ public class ProjectileBallController : MonoBehaviour
     /// </summary>
     private void UpdateTrailProgress(List<Vector3> points, int currentIndex)
     {
-        // 用渐变色区分已走/未走（简洁实现：调整颜色 alpha）
-        // 如需更精细效果，可改为分段 LineRenderer
+        // 用渐变色区分已走/未走，使用Gradient避免每帧new Color
         float progress = (float)currentIndex / Mathf.Max(points.Count - 1, 1);
-
-        // 修复：利用progress调整轨迹线的整体透明度和颜色渐变
-        // 已走部分（start）保持原颜色，未走部分（end）随progress降低透明度
-        Color currentStartColor = new Color(
-            trailStartColor.r,
-            trailStartColor.g,
-            trailStartColor.b,
-            trailStartColor.a // 已走部分保持不透明
-        );
-        Color currentEndColor = new Color(
-            trailEndColor.r,
-            trailEndColor.g,
-            trailEndColor.b,
-            trailEndColor.a * (1 - progress) // 未走部分随进度降低透明度
-        );
-
-        _lineRenderer.startColor = currentStartColor;
-        _lineRenderer.endColor = currentEndColor;
+        if (_trailGradient == null)
+        {
+            // 兜底：初始化一次
+            _trailGradient = new Gradient();
+            _colorKeys[0].color = trailStartColor;
+            _colorKeys[0].time = 0f;
+            _colorKeys[1].color = trailEndColor;
+            _colorKeys[1].time = 1f;
+            _alphaKeys[0].alpha = trailStartColor.a;
+            _alphaKeys[0].time = 0f;
+            _alphaKeys[1].alpha = trailEndColor.a;
+            _alphaKeys[1].time = 1f;
+            _trailGradient.SetKeys(_colorKeys, _alphaKeys);
+        }
+        Color c = _trailGradient.Evaluate(progress);
+        _lineRenderer.startColor = _trailGradient.Evaluate(0f);
+        _lineRenderer.endColor = c;
     }
 
     /// <summary>

@@ -23,7 +23,11 @@ using UnityEngine;
 public static class PhysicsSimulationCore
 {
     // 重力加速度（m/s²），在公式中作为正值使用，方向为 -Y
-    private const float Gravity = 9.8f;
+    // 由 const 改为 static，允许 ProjectileParamSetupModule.SetGravity() 运行时调整
+    private static float Gravity = 9.8f;
+
+    /// <summary>当前生效的重力加速度值（只读）。供数据分析模块读取。</summary>
+    public static float CurrentGravity => Gravity;
     // 全局地面高度（默认 y=0，可通过 SetGroundHeight 调整）
     private static float GroundY = 0f;
     // 轨迹点最大数量上限（防止参数异常或浮点精度问题导致的无限/爆炸循环）
@@ -186,6 +190,16 @@ public static class PhysicsSimulationCore
         Vector3 startPosition)
     {
         return SimulateProjectileMotion(initialVelocity, launchAngle, launchDirection, startPosition, 0.02f, 5f);
+    }
+
+    /// <summary>
+    /// 修改全局重力加速度（运行时可调，供 ProjectileParamSetupModule 调用）。
+    /// </summary>
+    /// <param name="newGravity">新的重力值（m/s²），建议范围 [1, 20]</param>
+    public static void SetGravity(float newGravity)
+    {
+        Gravity = Mathf.Max(0.1f, newGravity);
+        Debug.Log($"[PhysicsSimulationCore] 重力加速度已调整为 g = {Gravity} m/s²");
     }
 
     /// <summary>

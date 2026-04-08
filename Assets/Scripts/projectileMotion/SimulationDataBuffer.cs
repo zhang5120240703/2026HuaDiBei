@@ -16,6 +16,8 @@ using UnityEngine;
 ///
 /// 设计原则：静态类，全局唯一，不持有 MonoBehaviour，不操作任何 GameObject 或 UI。
 /// </summary>
+using System.Text;
+using System.IO;
 public static class SimulationDataBuffer
 {
     // ── 核心数据属性 ─────────────────────────────────────────────────
@@ -92,8 +94,7 @@ public static class SimulationDataBuffer
     {
         if (newPoints == null || newPoints.Count == 0)
         {
-            Debug.LogWarning("[SimulationDataBuffer] UpdateTrajectoryData 收到空数据，" +
-                             "轨迹缓冲区已被清空。");
+            Debug.LogWarning("[SimulationDataBuffer] UpdateTrajectoryData 收到空数据，轨迹缓冲区已被清空。");
             CurrentTrajectoryPoints = new List<Vector3>();
             RelativeTrajectoryPoints = null;
             LocalOrigin = Vector3.zero;
@@ -113,17 +114,22 @@ public static class SimulationDataBuffer
         XDistance = Mathf.Abs(end.x - start.x);
         YDistance = Mathf.Abs(end.y - start.y);
 
+        // 性能优化：手动展开距离计算，避免Vector3.Distance
         float pathLen = 0f;
         for (int i = 1; i < newPoints.Count; i++)
-            pathLen += Vector3.Distance(newPoints[i - 1], newPoints[i]);
+        {
+            Vector3 a = newPoints[i - 1];
+            Vector3 b = newPoints[i];
+            float dx = b.x - a.x;
+            float dy = b.y - a.y;
+            float dz = b.z - a.z;
+            pathLen += Mathf.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
         TotalDistance = pathLen;
 
         // ── 生成相对坐标列表 ──────────────────────────────────────────
-        // 以轨迹第一个点（小球发射起点）为原点，换算每个点的相对坐标，
-        // 并对每个分量保留一位小数（四舍五入）。
         LocalOrigin = start;
         RelativeTrajectoryPoints = new List<Vector3>(newPoints.Count);
-
         for (int i = 0; i < newPoints.Count; i++)
         {
             Vector3 delta = newPoints[i] - start;
@@ -180,13 +186,44 @@ public static class SimulationDataBuffer
     /// </summary>
     /// <param name="v">输入向量</param>
     /// <param name="decimals">保留小数位数（1 = 保留一位小数）</param>
+    // 性能优化：查表法替代Mathf.Pow
+    private static readonly float[] Pow10 = {1f, 10f, 100f, 1000f, 10000f, 100000f};
     private static Vector3 RoundVector3(Vector3 v, int decimals)
     {
-        float factor = Mathf.Pow(10f, decimals); // decimals=1 → factor=10
+        float factor = (decimals >= 0 && decimals < Pow10.Length) ? Pow10[decimals] : Mathf.Pow(10f, decimals);
         return new Vector3(
             Mathf.Round(v.x * factor) / factor,
             Mathf.Round(v.y * factor) / factor,
             Mathf.Round(v.z * factor) / factor);
+    }
+
+    /// <summary>
+    /// 导出当前轨迹点为CSV文件（世界坐标+相对坐标）
+    /// </summary>
+    public static void ExportTrajectoryToCSV(string path)
+    {
+        if (CurrentTrajectoryPoints == null || CurrentTrajectoryPoints.Count == 0)
+        {
+            Debug.LogWarning("[SimulationDataBuffer] 无有效轨迹数据，无法导出CSV。");
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("Index,WorldX,WorldY,WorldZ,RelativeX,RelativeY,RelativeZ");
+        for (int i = 0; i < CurrentTrajectoryPoints.Count; i++)
+        {
+            Vector3 w = CurrentTrajectoryPoints[i];
+            Vector3 r = (RelativeTrajectoryPoints != null && i < RelativeTrajectoryPoints.Count) ? RelativeTrajectoryPoints[i] : Vector3.zero;
+            sb.AppendFormat("{0},{1:F4},{2:F4},{3:F4},{4:F4},{5:F4},{6:F4}\n", i, w.x, w.y, w.z, r.x, r.y, r.z);
+        }
+        try
+        {
+            File.WriteAllText(path, sb.ToString());
+            Debug.Log($"[SimulationDataBuffer] 轨迹数据已导出到CSV: {path}");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[SimulationDataBuffer] 导出CSV失败: {ex.Message}");
+        }
     }
 }
 
