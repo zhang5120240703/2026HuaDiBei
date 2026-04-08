@@ -75,7 +75,18 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             }
             
             piston.localPosition = new Vector3(piston.localPosition.x, newPistonY, piston.localPosition.z);
-            
+
+            float currentPressure = GetPressure(); // 计算当前压强
+
+
+            // 如果压强超过最大值，则不再移动活塞
+            if (currentPressure >= IdealGasSimulation.Instance.GetMaxPressure())
+            {
+                // 达到最大压强时，停止拖动
+                isDragging = false;
+                Debug.Log("最大压强已达到，停止推进！");
+            }
+
             // 计算当前体积
             float currentVolume = GetCurrentVolume();
             OnVolumeChanged?.Invoke(currentVolume);
@@ -105,7 +116,13 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
 
         return Mathf.Clamp(volume, minHeight, maxHeight); // 保证体积在有效范围内
     }
-    
+
+    private float GetPressure()
+    {
+        float volume = GetCurrentVolume();
+        float pressure = (IdealGasSimulation.Instance.moles * IdealGasSimulation.R * IdealGasSimulation.Instance.GetTemperature()) / volume;
+        return Mathf.Clamp(pressure, IdealGasSimulation.Instance.GetMinPressure(), IdealGasSimulation.Instance.GetMaxPressure()); // 保证压强在合理范围内
+    }
     public void SetPistonPosition(float volume)
     {
         //// 根据体积设置活塞位置

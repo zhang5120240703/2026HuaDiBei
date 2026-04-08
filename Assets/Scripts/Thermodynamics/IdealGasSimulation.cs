@@ -2,8 +2,10 @@
 
 public class IdealGasSimulation : MonoBehaviour
 {
+    public static IdealGasSimulation Instance;
+
     // 理想气体常数 R (J/(mol·K))
-    private const float R = 8.314f;
+    public const float R = 8.314f;
     
     // 气体摩尔数 (mol)
     public float moles = 0.04f; // 约1升气体在标准状况下的摩尔数
@@ -35,12 +37,26 @@ public class IdealGasSimulation : MonoBehaviour
     private const float maxTemperature = 500.0f;
     
     // 压力范围限制
-    private const float minPressure = 1.0f;
-    private const float maxPressure = 500.0f;
+    public const float minPressure = 1.0f;
+    public const float maxPressure = 500.0f;
     
     // 事件
     public System.Action<float, float, float> OnStateChanged;
-    
+
+    private void Awake()
+    {
+        if(Instance ==null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+
+        
+    }
     private void Start()
     {
         // 初始设置

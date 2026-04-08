@@ -13,7 +13,7 @@ public class UIPanel : MonoBehaviour
     public TMP_Text volumeText;
     public TMP_Text temperatureText;
     public TMP_Text pvProductText;
-    public TMP_InputField temperatureInput;
+    public Slider temperatureSlider;
     public Button isothermalButton;
     public Button isobaricButton;
     public Button isochoricButton;
@@ -43,7 +43,7 @@ public class UIPanel : MonoBehaviour
         //isochoricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isochoric));
 
         // 温度输入事件
-        temperatureInput.onValueChanged.AddListener(OnTemperatureInputChanged);
+        temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
         
         // 控制按钮事件
         startButton.onClick.AddListener(StartExperiment);
@@ -65,19 +65,21 @@ public class UIPanel : MonoBehaviour
         volumeText.text = "体积: " + volume.ToString("F2") + " L";
         temperatureText.text = "温度: " + temperature.ToString("F2") + " K";
         pvProductText.text = "PV乘积: " + (pressure * volume).ToString("F2") + " kPa·L";
-        
-        // 更新温度输入
-        temperatureInput.text = temperature.ToString("F1");
+
+        // 更新Slider的值
+        temperatureSlider.value = temperature; // 同步Slider值
     }
-    
-    private void OnTemperatureInputChanged(string value)
+
+    // Slider改变时调用
+    private void OnTemperatureSliderChanged(float value)
     {
-        if (float.TryParse(value, out float temp))
-        {
-            gasSimulation.SetTemperature(temp);
-        }
+        // 使用Slider值来设置温度
+        gasSimulation.SetTemperature(value);
+
+        // 更新温度显示
+        temperatureText.text = "温度: " + value.ToString("F2") + " K";
     }
-    
+
     public void SetProcess(int process)
     {
         gasSimulation.SetProcess((IdealGasSimulation.ProcessType)process);
