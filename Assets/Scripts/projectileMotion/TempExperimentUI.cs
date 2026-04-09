@@ -205,6 +205,26 @@ public class TempExperimentUI : MonoBehaviour
         GUILayout.EndArea();
     }
 
+    // ── 日志面板 ──────────────────────────────────────────────────────
+
+    private void DrawLogPanel()
+    {
+        GUILayout.Label("📋 事件日志", _styleTitle);
+        GUILayout.Space(2);
+
+        _logScroll = GUILayout.BeginScrollView(_logScroll,
+            GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+
+        // 最新日志在最上面                         
+        for (int i = _log.Count - 1; i >= 0; i--)
+            GUILayout.Label(_log[i], _styleLog);
+
+        GUILayout.EndScrollView();
+
+        if (GUILayout.Button("清空日志", GUILayout.Height(24)))
+            _log.Clear();
+    }
+
     // ── 主控制面板内容 ────────────────────────────────────────────────
 
     private void DrawControlPanel()
@@ -269,18 +289,18 @@ public class TempExperimentUI : MonoBehaviour
         {
             GUI.color = Color.green;
             if (GUILayout.Button("▶ 恢复", GUILayout.Height(BtnH)))
-                _ctrl?.RequestResume();
+                DispatchResume();
         }
         else
         {
             GUI.color = Color.yellow;
             if (GUILayout.Button("⏸ 暂停", GUILayout.Height(BtnH)))
-                _ctrl?.RequestPause();
+                DispatchPause();
         }
 
         GUI.color = new Color(1f, 0.5f, 0.3f);
         if (GUILayout.Button("🔄 重置", GUILayout.Height(BtnH)))
-            _ctrl?.RequestReset();
+            DispatchReset();
 
         GUI.color = Color.white;
         GUILayout.EndHorizontal();
@@ -296,7 +316,7 @@ public class TempExperimentUI : MonoBehaviour
 
         GUI.color = Color.cyan;
         if (GUILayout.Button("✅ 确认准备完成", GUILayout.Height(BtnH + 6)))
-            _ctrl?.ConfirmPrepare();
+            DispatchConfirmPrepare();
         GUI.color = Color.white;
     }
 
@@ -341,7 +361,7 @@ public class TempExperimentUI : MonoBehaviour
 
         GUI.color = Color.yellow;
         if (GUILayout.Button("📤 写入参数（预览）", GUILayout.Height(BtnH)))
-            PushParamsToController();
+            DispatchPushParams();
         GUI.color = Color.white;
 
         GUILayout.Space(2);
@@ -349,8 +369,8 @@ public class TempExperimentUI : MonoBehaviour
         GUI.color = Color.cyan;
         if (GUILayout.Button("✅ 确认参数，开始仿真", GUILayout.Height(BtnH + 4)))
         {
-            PushParamsToController();
-            _ctrl?.ConfirmParam();
+            DispatchPushParams();
+            DispatchConfirmParam();
         }
         GUI.color = Color.white;
     }
@@ -379,7 +399,7 @@ public class TempExperimentUI : MonoBehaviour
 
         GUI.color = Color.cyan;
         if (GUILayout.Button("✅ 观察完毕，进入结束", GUILayout.Height(BtnH + 4)))
-            _ctrl?.ConfirmObserved();
+            DispatchConfirmObserved();
         GUI.color = Color.white;
     }
 
@@ -395,28 +415,69 @@ public class TempExperimentUI : MonoBehaviour
 
         GUI.color = Color.green;
         if (GUILayout.Button("🎉 完成，再来一次", GUILayout.Height(BtnH + 6)))
-            _ctrl?.ConfirmFinish();
+            DispatchConfirmFinish();
         GUI.color = Color.white;
     }
 
-    // ── 日志面板 ──────────────────────────────────────────────────────
-
-    private void DrawLogPanel()
+    // ── 调度器：将 UI 操作路由到 UserActionManager 或 Controller（降低耦合）
+    private void DispatchPause()
     {
-        GUILayout.Label("📋 事件日志", _styleTitle);
-        GUILayout.Space(2);
+        if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.PauseExperiment);
+        else
+            _ctrl?.RequestPause();
+    }
 
-        _logScroll = GUILayout.BeginScrollView(_logScroll,
-            GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+    private void DispatchResume()
+    {
+        if (_ctrl != null)
+            _ctrl.RequestResume();
+        else if (ExperimentStateManager.Instance != null)
+            ExperimentStateManager.Instance.StartExperiment();
+    }
 
-        // 最新日志在最上面
-        for (int i = _log.Count - 1; i >= 0; i--)
-            GUILayout.Label(_log[i], _styleLog);
+    private void DispatchReset()
+    {
+        if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.ResetExperiment);
+        else
+            _ctrl?.RequestReset();
+    }
 
-        GUILayout.EndScrollView();
+    private void DispatchConfirmPrepare()
+    {
+        if (_ctrl != null) _ctrl.ConfirmPrepare();
+        else if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.JumpToNextStep);
+    }
 
-        if (GUILayout.Button("清空日志", GUILayout.Height(24)))
-            _log.Clear();
+    private void DispatchPushParams()
+    {
+        PushParamsToController();
+        // 尝试通知通用动作管理器参数被修改（非必要）
+        if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.ModifyParameter);
+    }
+
+    private void DispatchConfirmParam()
+    {
+        if (_ctrl != null) _ctrl.ConfirmParam();
+        else if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.ConfirmParam);
+    }
+
+    private void DispatchConfirmObserved()
+    {
+        if (_ctrl != null) _ctrl.ConfirmObserved();
+        else if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.JumpToNextStep);
+    }
+
+    private void DispatchConfirmFinish()
+    {
+        if (_ctrl != null) _ctrl.ConfirmFinish();
+        else if (UserActionManager.Instance != null)
+            UserActionManager.Instance.CaptureUserAction(UserActionType.JumpToNextStep);
     }
 
     // ══════════════════════════════════════════════════════════════════

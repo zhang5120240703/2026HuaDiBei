@@ -43,7 +43,7 @@ public class ProjectileBallController : MonoBehaviour
     [Tooltip("是否在实验开始时自动播放动画（true = 进入 Step3_RunSim 后自动播放）")]
     public bool autoPlayOnStep3 = true;
 
-    [Header("小球外观")]
+    [Header("落地动画")]
     [Tooltip("落地时是否播放一次缩放弹跳效果")]
     public bool playLandingBounce = true;
 
