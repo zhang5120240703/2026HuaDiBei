@@ -8,14 +8,15 @@ public class Pendulum : MonoBehaviour
 
     [Header("单摆参数")]
     public float pendulumLength = 2f; // 摆长（单位：米）
-    public float periodT = 1.5f;      // 手动输入的周期，用于计算g
+    [HideInInspector] public float fixedG = 10f; // 固定重力加速度=10
+    [HideInInspector] public float theoreticalPeriod; // 理论周期（基于g=10计算）
 
     [Header("实验结果")]
-    public float calculatedG;         // 计算出的重力加速度
+    public float calculatedG;         // 兼容原有显示，固定为10
 
     private Camera mainCam;
     private bool isDragging = false;
-    private HingeJoint hinge;
+    public HingeJoint hinge;
 
     void Start()
     {
@@ -48,20 +49,24 @@ public class Pendulum : MonoBehaviour
         hinge.autoConfigureConnectedAnchor = false;
         hinge.connectedAnchor = Vector3.zero;
 
-        // 5. 配置摆球
+        // 5. 配置摆球（优化物理参数，匹配g=10的周期）
         ball.useGravity = true;
         ball.isKinematic = false;
-        ball.angularDrag = 0.2f;
-        ball.drag = 0f;
+        ball.angularDrag = 0.05f; // 降低阻尼，减少周期偏差
+        ball.drag = 0.001f;       // 极低线性阻尼
         ball.mass = 1f;
 
         // 6. 初始化摆球到竖直下垂
         ball.transform.position = transform.position - Vector3.up * pendulumLength;
+
+        // 初始化固定g和理论周期
+        calculatedG = fixedG;
+        CalculateTheoreticalPeriod();
     }
 
     void Update()
     {
-        UpdateLineVisual();
+        //UpdateLineVisual();
 
         // 鼠标左键按下
         if (Input.GetMouseButtonDown(0))
@@ -77,20 +82,33 @@ public class Pendulum : MonoBehaviour
             }
         }
 
-        // 拖动中
+        // 拖动中 —— 核心修改：使用 DragControl 的 currentLength 而非固定的 pendulumLength
+        // 拖动中 —— 核心修改：锁定Z轴 + 强制XY平面运动
         if (isDragging)
         {
             Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
-            Plane dragPlane = new Plane(Vector3.forward, transform.position.z);
+            Plane dragPlane = new Plane(Vector3.forward, transform.position.z); // 悬挂点的Z平面
 
             if (dragPlane.Raycast(ray, out float enterDistance))
             {
                 Vector3 mouseWorldPos = ray.GetPoint(enterDistance);
+                // 关键：强制鼠标世界坐标的Z轴 = 悬挂点的Z轴，彻底锁死前后移动
+                mouseWorldPos.z = transform.position.z;
+
                 Vector3 dirToMouse = mouseWorldPos - transform.position;
+                // 同样锁死dirToMouse的Z轴
+                dirToMouse.z = 0;
 
                 if (dirToMouse.magnitude > 0.01f)
                 {
-                    ball.transform.position = transform.position + dirToMouse.normalized * pendulumLength;
+                    // 改为获取 DragControl 的当前摆长
+                    PendulumDragControl dragControl = GetComponent<PendulumDragControl>();
+                    float currentLength = dragControl != null ? dragControl.currentLength : pendulumLength;
+
+                    // 计算目标位置并锁死Z轴
+                    Vector3 targetPos = transform.position + dirToMouse.normalized * currentLength;
+                    targetPos.z = transform.position.z; // 最终位置强制Z轴一致
+                    ball.transform.position = targetPos;
                 }
             }
         }
@@ -109,10 +127,31 @@ public class Pendulum : MonoBehaviour
                 Vector3 correctAnchor = transform.position - ball.transform.position;
                 hinge.anchor = correctAnchor;
             }
+
+            // 新增：激活周期计数
+            PendulumCounter counter = FindObjectOfType<PendulumCounter>();
+            if (counter != null)
+            {
+                counter.ActivateSwingCount();
+            }
         }
     }
 
-    void UpdateLineVisual()
+    /// <summary>
+    /// 基于固定g=10计算理论周期
+    /// </summary>
+    [ContextMenu("计算理论周期")]
+    public void CalculateTheoreticalPeriod()
+    {
+        theoreticalPeriod = 2 * Mathf.PI * Mathf.Sqrt(pendulumLength / fixedG);
+        calculatedG = fixedG; // 强制固定为10
+        Debug.Log($" 单摆参数（g固定为10）：");
+        Debug.Log($"   摆长 L = {pendulumLength:F2} m");
+        Debug.Log($"   理论周期 T = {theoreticalPeriod:F2} s");
+        Debug.Log($"   重力加速度 g = {calculatedG:F2} m/s²");
+    }
+
+    /*void UpdateLineVisual()
     {
         if (line == null || ball == null) return;
 
@@ -122,22 +161,7 @@ public class Pendulum : MonoBehaviour
         float actualLength = Vector3.Distance(transform.position, ball.position);
         line.localScale = new Vector3(0.08f, actualLength / 2f, 0.08f);
     }
-
-   /* [ContextMenu("计算重力加速度")]
-    public void CalculateGravity()
-    {
-        if (periodT <= 0)
-        {
-            Debug.LogError("周期T必须大于0！");
-            return;
-        }
-        calculatedG = (4 * Mathf.PI * Mathf.PI * pendulumLength) / (periodT * periodT);
-        Debug.Log($" 单摆实验计算结果：");
-        Debug.Log($"   摆长 L = {pendulumLength:F2} m");
-        Debug.Log($"   周期 T = {periodT:F2} s");
-        Debug.Log($"   计算重力加速度 g = {calculatedG:F2} m/s²");
-    }
-   */
+    
     [ContextMenu("复位单摆")]
     public void ResetPendulum()
     {
@@ -154,4 +178,5 @@ public class Pendulum : MonoBehaviour
             hinge.anchor = correctAnchor;
         }
     }
+    */
 }
