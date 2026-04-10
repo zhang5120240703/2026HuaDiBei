@@ -50,7 +50,7 @@ public class ProjectileExperimentController : MonoBehaviour
 
     [Tooltip("仰角（°），0 = 平抛，45 = 最优斜抛")]
     [Range(0f, 90f)]
-    public float defaultAngle = 45f;
+    public float defaultAngle = 0f;
 
     [Tooltip("水平发射方向（XZ 平面，自动忽略 Y 分量）")]
     public Vector3 defaultDirection = Vector3.forward;
@@ -60,7 +60,7 @@ public class ProjectileExperimentController : MonoBehaviour
 
     [Tooltip("物理计算时间步长（s），越小越精确，建议 0.01 ~ 0.05")]
     public float defaultTimeStep = 0.02f;
-
+    // 注意：时间步长过大可能导致轨迹不平滑，甚至错过碰撞点；过小则计算量增加，可能导致性能问题。
     [Tooltip("最大模拟时长（s），超过此时间停止计算")]
     public float defaultTotalTime = 5f;
 

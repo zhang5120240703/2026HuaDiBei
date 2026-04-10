@@ -9,10 +9,7 @@ using UnityEngine;
 ///   【读取方】UI绘制模块，AI分析模块：通过 CurrentTrajectoryPoints 消费数据
 ///   【清空方】重置事件时，由交互逻辑或系统集成调用 ClearData()
 ///   【小球端】ProjectileBallController 通过 HasValidData() + CurrentTrajectoryPoints 驱动动画
-///
-/// 三维适配说明：
-/// 
-///   三维版本：List&lt;Vector3&gt;（世界空间三维坐标，由 PhysicsSimulationCore 计算得出）
+//
 ///
 /// 设计原则：静态类，全局唯一，不持有 MonoBehaviour，不操作任何 GameObject 或 UI。
 /// </summary>

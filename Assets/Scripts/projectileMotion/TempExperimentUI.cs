@@ -416,32 +416,26 @@ public class TempExperimentUI : MonoBehaviour
         GUI.color = Color.green;
         if (GUILayout.Button("🎉 完成，再来一次", GUILayout.Height(BtnH + 6)))
             DispatchConfirmFinish();
-        GUI.color = Color.white;
+        GUI.color = Color.white;                
     }
 
-    // ── 调度器：将 UI 操作路由到 UserActionManager 或 Controller（降低耦合）
+    // ── 调度器：将 UI 操作路由到 Controller（确保事件链完整）
     private void DispatchPause()
     {
-        if (UserActionManager.Instance != null)
-            UserActionManager.Instance.CaptureUserAction(UserActionType.PauseExperiment);
-        else
-            _ctrl?.RequestPause();
+        // 直接调用 Controller 的 RequestPause()，确保 OnPaused 事件被触发
+        _ctrl?.RequestPause();
     }
 
     private void DispatchResume()
     {
-        if (_ctrl != null)
-            _ctrl.RequestResume();
-        else if (ExperimentStateManager.Instance != null)
-            ExperimentStateManager.Instance.StartExperiment();
+        // 直接调用 Controller 的 RequestResume()，确保 OnResumed 事件被触发
+        _ctrl?.RequestResume();
     }
 
     private void DispatchReset()
     {
-        if (UserActionManager.Instance != null)
-            UserActionManager.Instance.CaptureUserAction(UserActionType.ResetExperiment);
-        else
-            _ctrl?.RequestReset();
+        // 直接调用 Controller 的 RequestReset()，确保 OnReset 事件被触发
+        _ctrl?.RequestReset();
     }
 
     private void DispatchConfirmPrepare()
