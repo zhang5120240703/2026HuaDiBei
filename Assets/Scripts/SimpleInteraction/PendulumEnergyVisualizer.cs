@@ -61,7 +61,7 @@ public class PendulumEnergyVisualizer : MonoBehaviour
         _totalEnergyBuffer = new float[graphWidth];
         _bufferIndex = 0;
 
-        // 初始化纹理（关键：强制读写+立即应用）
+        // 初始化纹理
         _energyGraphTexture = new Texture2D(graphWidth, graphHeight, TextureFormat.RGBA32, false);
         _energyGraphTexture.filterMode = FilterMode.Bilinear;
         _energyGraphTexture.wrapMode = TextureWrapMode.Clamp;
@@ -105,7 +105,7 @@ public class PendulumEnergyVisualizer : MonoBehaviour
         float ep = ballMass * gravity * heightDiff;
         float total = ek + ep;
 
-        // 5. 动态更新最大能量（避免归一化后无显示）
+        // 5. 动态更新最大能量
         _maxEnergy = Mathf.Max(_maxEnergy, total, 1f);
 
         // 6. 存入缓存
@@ -114,11 +114,6 @@ public class PendulumEnergyVisualizer : MonoBehaviour
         _totalEnergyBuffer[_bufferIndex] = total;
         _bufferIndex = (_bufferIndex + 1) % graphWidth;
 
-        // 调试日志（可删除）
-        if (_bufferIndex % 50 == 0)
-        {
-            Debug.Log($"动能：{ek:F2} | 势能：{ep:F2} | 总能量：{total:F2} | 最大能量：{_maxEnergy:F2}");
-        }
     }
 
     /// <summary>
@@ -143,7 +138,7 @@ public class PendulumEnergyVisualizer : MonoBehaviour
     }
 
     /// <summary>
-    /// 更新能量数值文本（修复空传播+确保方法定义正确）
+    /// 更新能量数值文本
     /// </summary>
     private void UpdateEnergyText(float ek, float ep, float total)
     {
@@ -157,12 +152,13 @@ public class PendulumEnergyVisualizer : MonoBehaviour
     }
 
     /// <summary>
-    /// 更新能量变化曲线图（修复索引+放大点大小）
+    /// 更新能量变化曲线图
     /// </summary>
     private void UpdateEnergyGraph()
     {
-        // 清空画布（深灰色背景，对比更明显）
-        Color bgColor = new Color(0f, 0f, 0f, 0f);
+        
+        Color bgColor = new Color(0, 0, 0, 0);
+
         for (int i = 0; i < _graphPixels.Length; i++)
         {
             _graphPixels[i] = bgColor;
@@ -220,7 +216,9 @@ public class PendulumEnergyVisualizer : MonoBehaviour
     /// </summary>
     private void ClearGraphTexture()
     {
-        Color bgColor = new Color(0.05f, 0.05f, 0.05f, 1f);
+       
+        Color bgColor = new Color(0, 0, 0, 0);
+
         for (int i = 0; i < _graphPixels.Length; i++)
         {
             _graphPixels[i] = bgColor;
