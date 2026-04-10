@@ -3,139 +3,114 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// 单摆控制脚本：UI按钮调摆长 + 鼠标拖摆球调角度
-/// 摆长：点击±按钮增减 | 角度：鼠标拖摆球左右（严格限制）
-
+/// 用于控制单摆UI滑动条调摆长 + 鼠标拖拽调整角度
+/// 功能：滑动条调整摆长 | 角度：鼠标拖拽调整，有最大限制
 /// </summary>
 public class PendulumDragControl : MonoBehaviour
 {
-    [Header("=== 单摆核心对象（必赋值）===")]
+    [Header("=== 单摆核心组件（赋值）===")]
     public Rigidbody pendulumBall;       // 摆球Rigidbody
     public Transform pendulumLine;       // 摆线
 
-    [Header("=== 摆长调节-UI按钮（必赋值）===")]
-    public Button btnLengthAdd;          // 摆长+ 按钮
-    public Button btnLengthMinus;        // 摆长- 按钮
+    [Header("=== 摆长调节-滑动条（赋值）===")]
+    public Slider lengthSlider;          // 摆长调节滑动条
 
-    [Header("=== 调节参数（可视化修改）===")]
+    [Header("=== 摆长配置（仅修改这里）===")]
     [Range(0.1f, 0.5f)]
-    public float lengthStep = 0.2f;      // 点击按钮的摆长增减步长（米）
-    [Range(0.5f, 5f)]
-    public float minLength = 0.5f;       // 最小摆长（防止过短）
-    [Range(0.5f, 5f)]
-    public float maxLength = 3f;         // 最大摆长（防止过长）
+    public float lengthStep = 0.2f;      // （保留字段，可删除）
+    public float minLength = 0.5f;       // 最小摆长（和滑动条Min一致）
+    public float maxLength = 2f;         // 最大摆长（和滑动条Max一致）
     [Range(10f, 80f)]
-    public float maxSwingAngle = 45f;    // 最大摆动角度（±N度，严格限制）
+    public float maxSwingAngle = 45f;    // 单摆最大摆动角度（度）
 
-    [Header("=== 实时数据（只读）===")]
+    [Header("=== 实时数据（仅显示）===")]
     public float currentLength;          // 当前实际摆长
     public float currentAngle;           // 当前实际摆动角度（度）
 
     // 内部状态
     private Camera _mainCam;
     private bool _isDraggingBall;
-    private Plane _dragPlane;            // 角度拖动平面（固定Z轴，仅XY）
+    private Plane _dragPlane;            // 拖拽平面（固定Z轴，仅XY）
 
     void Start()
     {
         // 初始化主相机
         _mainCam = Camera.main ?? FindObjectOfType<Camera>();
-        if (_mainCam == null) { Debug.LogError("未找到主相机！"); enabled = false; return; }
+        if (_mainCam == null) { Debug.LogError("未找到主相机"); enabled = false; return; }
 
-        // 强制校验核心对象
-        if (pendulumBall == null) { Debug.LogError("请赋值摆球Rigidbody！"); enabled = false; return; }
-        if (pendulumLine == null) { Debug.LogError("请赋值摆线（Cylinder）Transform！"); enabled = false; return; }
-        if (btnLengthAdd == null || btnLengthMinus == null) { Debug.LogError("请赋值摆长±UI按钮！"); enabled = false; return; }
+        // 校验核心组件
+        if (pendulumBall == null) { Debug.LogError("未赋值摆球Rigidbody"); enabled = false; return; }
+        if (pendulumLine == null) { Debug.LogError("未赋值摆线（Cylinder）Transform"); enabled = false; return; }
+        if (lengthSlider == null) { Debug.LogError("未赋值摆长调节滑动条"); enabled = false; return; }
 
-        // 摆球自动补全Collider（射线检测必须）
+        // 自动给摆球添加Collider（拖拽检测用）
         if (pendulumBall.GetComponent<Collider>() == null)
         {
             pendulumBall.gameObject.AddComponent<SphereCollider>();
             Debug.LogWarning("摆球无Collider，已自动添加");
         }
 
-        // 初始化摆长（基于悬挂点到摆球的初始距离）
+        // 初始化摆长（绑定滑动条值）
         currentLength = Mathf.Clamp(Vector3.Distance(transform.position, pendulumBall.position), minLength, maxLength);
-        // 初始化拖动平面（固定Z轴，避免摆球飘走）
+        lengthSlider.minValue = minLength;   // 同步滑动条最小范围
+        lengthSlider.maxValue = maxLength;   // 同步滑动条最大范围
+        lengthSlider.value = currentLength;  // 滑动条初始值匹配当前摆长
+
+        // 初始化拖拽平面（固定Z轴，跟随摆悬挂点）
         _dragPlane = new Plane(Vector3.forward, transform.position.z);
-        // 绑定UI按钮点击事件
-        BindButtonEvents();
-        // 复位单摆到竖直下垂
-        //ResetPendulum();
+        // 绑定滑动条监听事件
+        BindSliderEvents();
+        // 初始化摆线显示
+        UpdatePendulumVisual();
 
         Debug.Log($"初始化完成 → 当前摆长：{currentLength:F2}m | 最大摆角：{maxSwingAngle}°");
-        Debug.Log("操作规则：1. 点击UI按钮调摆长  2. 鼠标拖摆球调角度");
+        Debug.Log("操作说明：1. 滑动条调节摆长  2. 鼠标拖拽调整摆角");
     }
 
     void Update()
     {
         if (pendulumBall == null || pendulumLine == null) return;
 
-        HandleMouseDragAngle();   // 鼠标拖摆球调角度
-        UpdatePendulumVisual();   // 实时更新摆线显示
+        HandleMouseDragAngle();   // 处理鼠标拖动角度
         UpdateCurrentAngle();     // 实时计算当前角度
+                                  // 移除原Update中的UpdatePendulumVisual()，改为：
+        if (!_isDraggingBall)
+        {
+            UpdatePendulumVisual(); // 非拖动时仍在Update更新
+        }
+        // 拖动时已在DragBallAdjustAngle中即时更新，避免重复
     }
 
-    #region 核心1：绑定UI按钮，点击增减摆长
+    #region 功能1：滑动条调节摆长
     /// <summary>
-    /// 绑定摆长±按钮的点击事件
+    /// 绑定滑动条值改变事件
     /// </summary>
-    void BindButtonEvents()
+    void BindSliderEvents()
     {
-        btnLengthAdd.onClick.AddListener(OnLengthAdd);
-        btnLengthMinus.onClick.AddListener(OnLengthMinus);
+        lengthSlider.onValueChanged.AddListener(OnLengthSliderChanged);
     }
 
     /// <summary>
-    /// 点击摆长+按钮：摆长增加，摆球向下，摆线变长
+    /// 滑动条值改变时调整摆长
     /// </summary>
-    void OnLengthAdd()
+    /// <param name="newLength">滑动条的新值</param>
+    void OnLengthSliderChanged(float newLength)
     {
-        currentLength = Mathf.Clamp(currentLength + lengthStep, minLength, maxLength);
+        currentLength = Mathf.Clamp(newLength, minLength, maxLength); // 二次校验范围
         UpdateBallPosition();
-        Debug.Log($"摆长+ → 当前摆长：{currentLength:F2}m");
-    }
-
-    /// <summary>
-    /// 点击摆长-按钮：摆长减少，摆球向上，摆线变短
-    /// </summary>
-    void OnLengthMinus()
-    {
-        currentLength = Mathf.Clamp(currentLength - lengthStep, minLength, maxLength);
-        UpdateBallPosition();
-        Debug.Log($"摆长- → 当前摆长：{currentLength:F2}m");
-    }
-
-    /// <summary>
-    /// 根据当前摆长，更新摆球位置（竖直上下，保留当前角度）
-    /// </summary>
-    void UpdateBallPosition()
-    {
-        // 保留当前角度，仅竖直上下移动摆球
-        float rad = currentAngle * Mathf.Deg2Rad;
-        Vector3 targetPos = new Vector3(
-            transform.position.x + Mathf.Sin(rad) * currentLength,
-            transform.position.y - Mathf.Cos(rad) * currentLength,
-            transform.position.z
-        );
-        // 固定摆球位置，清空物理速度避免晃动
-        pendulumBall.isKinematic = true;
-        pendulumBall.transform.position = targetPos;
-        pendulumBall.velocity = Vector3.zero;
-        pendulumBall.angularVelocity = Vector3.zero;
-        pendulumBall.isKinematic = false;
+        SyncLengthToOtherScripts(); // 同步摆长到其他脚本（Pendulum/PendulumCounter）
+        Debug.Log($"当前摆长：{currentLength:F2}m");
     }
     #endregion
 
-    #region 核心2：鼠标拖摆球调角度（严格限制，仅左右）
+    #region 功能2：鼠标拖拽调整摆角（原有逻辑不变）
     /// <summary>
-    /// 处理鼠标拖动摆球，仅调节摆动角度
+    /// 处理鼠标拖拽行为，调整摆角
     /// </summary>
     void HandleMouseDragAngle()
     {
-        
-
-        // 鼠标按下：开始拖动
+        // 鼠标按下：开始拖拽
+        // PendulumDragControl.cs 中修改鼠标按下逻辑
         if (Input.GetMouseButtonDown(0) && !_isDraggingBall)
         {
             Ray ray = _mainCam.ScreenPointToRay(Input.mousePosition);
@@ -144,16 +119,19 @@ public class PendulumDragControl : MonoBehaviour
                 _isDraggingBall = true;
                 pendulumBall.isKinematic = true;
                 pendulumBall.velocity = Vector3.zero;
+                pendulumBall.angularVelocity = Vector3.zero;
+                // 新增：拖动开始时立即同步摆线
+                UpdatePendulumVisual();
             }
         }
 
-        // 鼠标松开：停止拖动，恢复物理
+        // 鼠标松开：停止拖拽
         if (Input.GetMouseButtonUp(0) && _isDraggingBall)
         {
             StopDrag();
         }
 
-        // 拖动中：调节角度（摆长固定）
+        // 拖拽中：调整角度（摆长固定）
         if (_isDraggingBall)
         {
             DragBallAdjustAngle();
@@ -161,7 +139,10 @@ public class PendulumDragControl : MonoBehaviour
     }
 
     /// <summary>
-    /// 拖动摆球调节角度，严格限制最大角度
+    /// 拖拽摆球调整角度（限制最大角度）
+    /// </summary>
+    /// <summary>
+    /// 拖动摆球调整角度（限制Z轴）
     /// </summary>
     void DragBallAdjustAngle()
     {
@@ -169,37 +150,42 @@ public class PendulumDragControl : MonoBehaviour
         if (!_dragPlane.Raycast(ray, out float enter)) return;
 
         Vector3 mousePos = ray.GetPoint(enter);
+        // 强制摆球位置Z轴 = 悬挂点Z轴
         mousePos.z = transform.position.z;
+
         Vector3 dir = mousePos - transform.position;
-        dir.z = 0;
+        dir.z = 0; // 仅在XY平面运动
         if (dir.magnitude < 0.01f) return;
 
-        // 计算角度并严格限制
+        // 计算目标角度（限制最大摆动角度）
         float targetAngle = Mathf.Atan2(dir.x, -dir.y) * Mathf.Rad2Deg;
         targetAngle = Mathf.Clamp(targetAngle, -maxSwingAngle, maxSwingAngle);
         float rad = targetAngle * Mathf.Deg2Rad;
 
-        // 摆长固定，仅更新角度对应的位置
+        // 计算目标位置（强制Z轴一致）
         Vector3 targetPos = new Vector3(
             transform.position.x + Mathf.Sin(rad) * currentLength,
             transform.position.y - Mathf.Cos(rad) * currentLength,
-            transform.position.z
+            transform.position.z // 锁定Z轴
         );
         pendulumBall.transform.position = targetPos;
+
+        // 关键修改：拖动时立即更新摆线，无延迟
+        UpdatePendulumVisual();
     }
 
     /// <summary>
-    /// 停止拖动，恢复单摆自然摆动
+    /// 停止拖拽，释放摆球
     /// </summary>
     void StopDrag()
     {
         _isDraggingBall = false;
         pendulumBall.isKinematic = false;
-        Debug.Log($"停止调角度 → 当前摆角：{currentAngle:F1}°");
+        Debug.Log($"停止拖拽 → 当前摆角：{currentAngle:F1}°");
     }
 
     /// <summary>
-    /// 实时计算当前摆动角度（度）
+    /// 实时计算当前摆角（度）
     /// </summary>
     void UpdateCurrentAngle()
     {
@@ -209,44 +195,76 @@ public class PendulumDragControl : MonoBehaviour
     }
     #endregion
 
-    #region 辅助：更新摆线/复位单摆
+    #region 辅助功能：更新摆线/同步摆长/更新摆球位置
     /// <summary>
     /// 实时更新摆线的位置、旋转、缩放
-
     /// </summary>
     void UpdatePendulumVisual()
     {
         Vector3 lineDir = pendulumBall.position - transform.position;
         float actualLen = lineDir.magnitude;
 
-        // 摆线位置：悬挂点和摆球的中点
+        // 原逻辑用Lerp插值导致位置延迟，改为直接设置中点
         pendulumLine.position = transform.position + lineDir * 0.5f;
-        // 摆线旋转：精准朝向摆球
+        // 优化旋转计算，避免LookRotation的额外开销
         pendulumLine.rotation = Quaternion.FromToRotation(Vector3.up, lineDir);
-        // 摆线缩放：长度同步，粗细固定
+        // 直接设置缩放，无插值
         pendulumLine.localScale = new Vector3(0.08f, actualLen / 2f, 0.08f);
     }
 
     /// <summary>
-    /// 复位单摆：竖直下垂（角度0°），保留当前摆长
-   
+    /// 根据当前摆长更新摆球位置（保持当前角度）
     /// </summary>
-   /* [ContextMenu("复位单摆（竖直下垂）")]
-    public void ResetPendulum()
+    public void UpdateBallPosition()
     {
-        _isDraggingBall = false;
-        currentAngle = 0;
-        // 摆球回到悬挂点正下方
+        // 计算目标位置（基于当前角度和新摆长）
+        float rad = currentAngle * Mathf.Deg2Rad;
+        Vector3 targetPos = new Vector3(
+            transform.position.x + Mathf.Sin(rad) * currentLength,
+            transform.position.y - Mathf.Cos(rad) * currentLength,
+            transform.position.z
+        );
+
+        // 移动摆球（临时禁用物理）
         pendulumBall.isKinematic = true;
-        pendulumBall.transform.position = transform.position - Vector3.up * currentLength;
+        pendulumBall.transform.position = targetPos;
         pendulumBall.velocity = Vector3.zero;
         pendulumBall.angularVelocity = Vector3.zero;
         pendulumBall.isKinematic = false;
+
+        // 校准铰链关节（确保摆动轴正确）
+        Pendulum pendulum = GetComponent<Pendulum>();
+        if (pendulum != null && pendulum.hinge != null)
+        {
+            Vector3 correctAnchor = pendulum.transform.position - pendulumBall.transform.position;
+            pendulum.hinge.anchor = correctAnchor;
+            pendulum.hinge.connectedAnchor = Vector3.zero;
+        }
     }
-   */
+
+    /// <summary>
+    /// 同步摆长到其他脚本（Pendulum/PendulumCounter）
+    /// </summary>
+    private void SyncLengthToOtherScripts()
+    {
+        // 同步到Pendulum脚本
+        Pendulum pendulum = GetComponent<Pendulum>();
+        if (pendulum != null)
+        {
+            pendulum.pendulumLength = currentLength;
+            pendulum.CalculateTheoreticalPeriod(); // 同步摆长后更新理论周期
+        }
+        // 同步到周期计数器
+        PendulumCounter counter = FindObjectOfType<PendulumCounter>();
+        if (counter != null)
+        {
+            counter.pendulumLength = currentLength;
+            counter.CalculateTheoreticalPeriod(); // 同步摆长后更新理论周期
+        }
+    }
     #endregion
-   
-    // 销毁时同步摆长到原有计数器，保证g值计算准确
+
+    // 销毁时同步摆长（确保数据一致）
     void OnDestroy()
     {
         Pendulum pendulum = GetComponent<Pendulum>();
