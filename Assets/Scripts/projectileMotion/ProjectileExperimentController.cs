@@ -335,7 +335,6 @@ public class ProjectileExperimentController : MonoBehaviour
     }
 
     // ─── 通用控制接口（任意阶段均有效）──────────────────────────────
-
     /// <summary>
     /// [任意阶段 · UI调用] 暂停实验。
     /// - Step1/2/4/5（等待用户输入阶段）：即使用户已点击"确认"，流程也不会推进
@@ -350,14 +349,17 @@ public class ProjectileExperimentController : MonoBehaviour
         if (_inStep3Sim)
             ballController?.PauseAnimation();
 
-        // 通知状态管理器（供其他系统监听）
-        if (_stateManager.CurrentRunState == ExperimentRunState.Running)
-            _stateManager.PauseExperiment();
+        // ★ Bug Fix: 暂停时不改变 StateManager 状态。
+        // 原框架 ExperimentStateManager 缺少 ResumeExperiment() 方法，
+        // 如果在暂停时将状态改为 Paused，恢复后状态机无法回到 Running，
+        // 导致动画播放完毕时也无法转移至 Finished，WaitForCondition 将永远卡住。
+        // 暂停的语义已通过 _isPaused 和 ballController.PauseAnimation() 保证。
+        // if (_stateManager.CurrentRunState == ExperimentRunState.Running)
+        //     _stateManager.PauseExperiment();
 
         OnPaused?.Invoke();
         Debug.Log("[ExperimentController] ⏸ 实验已暂停。");
     }
-
     /// <summary>
     /// [任意阶段 · UI调用] 恢复已暂停的实验。
     /// Step3 阶段会同时恢复小球动画。
@@ -500,11 +502,7 @@ public class ProjectileExperimentController : MonoBehaviour
 
         OnStepEntered?.Invoke(ExperimentStep.Step3_RunSim);
 
-        // ★ Bug4 Fix: 用重试循环取代"在 DoStep3 内嵌 Step2 逻辑后 yield break"的破坏性写法。
-        //   原写法：失败→在 DoStep3 内滚回 Step2→yield break，但主循环在 DoStep3 返回后
-        //   直接进入 DoStep4，而 _flowController.CurrentStep 仍为 Step3，导致步骤错位。
-        //   新写法：循环直到计算成功或重置，失败时滚回 Step2 并等待重新确认，
-        //   所有步骤跳转都在循环内维护一致，不打断主循环节奏。
+
         List<Vector3> trajectoryPoints = null;
 
         while (true)
@@ -519,7 +517,7 @@ public class ProjectileExperimentController : MonoBehaviour
             if (trajectoryPoints != null && trajectoryPoints.Count > 0)
                 break; // 计算成功，退出重试循环
 
-            // ── 计算失败：退回 Step2 重新设参数 ─────────────────────
+            // ── 计算失败：退回 Step2 重新设参数 ─────────────────────---
             string err = "物理仿真失败：参数不合法或起点低于地面，请重新设置参数。";
             OnParamError?.Invoke(err);
             Debug.LogError($"[ExperimentController] {err}");
@@ -786,10 +784,12 @@ public class ProjectileExperimentController : MonoBehaviour
  挂载方式：
    将本脚本挂载到场景中任意 GameObject（建议挂到 ExperimentCoreEntry 同一个对象）。
    ballController 可留空，脚本会自动 FindObjectOfType 查找。
-
+/*
  ExperimentStateManager 的 Resume 说明：
-   原框架 ExperimentStateManager 无 ResumeExperiment() 方法，
-   本脚本通过 ballController.ResumeAnimation() 直接恢复动画，
-   同时 _isPaused 标志解除后 WaitForCondition 继续推进流程，
-   无需依赖 StateManager 的 Running 状态做恢复。
+   原框架 ExperimentStateManager 无 ResumeExperiment() 方法。
+   如果在 RequestPause() 中调用 PauseExperiment() 将状态置为 Paused，
+   恢复时由于无法调用 ResumeExperiment()，状态将卡在 Paused，
+   导致小球落地后无法触发状态转移至 Finished，WaitForCondition 死循环。
+   因此，本脚本在暂停时不调用 PauseExperiment()，仅通过 ballController.PauseAnimation() 暂停动画，
+   并由 _isPaused 标志控制流程挂起。小球落地后 StateManager 仍可正常从 Running 转移至 Finished。
 */
