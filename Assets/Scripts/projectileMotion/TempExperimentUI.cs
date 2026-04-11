@@ -16,27 +16,36 @@ public class TempExperimentUI : MonoBehaviour
 {
     // ── 依赖 ─────────────────────────────────────────────────────────
     private ProjectileExperimentController _ctrl;
-    private ExperimentStateManager         _stateMgr;
-    private ExperimentFlowController       _flowCtrl;
+    private ExperimentStateManager _stateMgr;
+    private ExperimentFlowController _flowCtrl;
 
     // ── 当前显示状态（由事件驱动更新）────────────────────────────────
-    private ExperimentStep    _currentStep     = ExperimentStep.Step1_Prepare;
-    private ExperimentRunState _runState       = ExperimentRunState.Idle;
-    private bool              _isPaused        = false;
+    private ExperimentStep _currentStep = ExperimentStep.Step1_Prepare;
+    private ExperimentRunState _runState = ExperimentRunState.Idle;
+    private bool _isPaused = false;
+
+    // ── 滚轮高度调节 ──────────────────────────────────────────────────
+    /// <summary>
+    /// 每格滚轮对应的高度变化量（米）。
+    /// Input.GetAxis("Mouse ScrollWheel") 单次约返回 ±0.1，
+    /// 乘以此系数后约为 ±0.5 m/格（可在 Inspector 修改）。
+    /// </summary>
+    [Tooltip("鼠标滚轮每格调节的起点高度幅度（米）")]
+    public float scrollHeightStep = 0.5f;
 
     // ── Step2 参数输入字段 ────────────────────────────────────────────
-    private string _inputVelocity  = "10";
-    private string _inputAngle     = "45";
-    private string _inputDirX      = "0";
-    private string _inputDirZ      = "1";
-    private string _inputStartY    = "1";
-    private string _inputTimeStep  = "0.02";
+    private string _inputVelocity = "10";
+    private string _inputAngle = "45";
+    private string _inputDirX = "0";
+    private string _inputDirZ = "1";
+    private string _inputStartY = "1";
+    private string _inputTimeStep = "0.02";
     private string _inputTotalTime = "5";
 
     // ── 事件日志 ─────────────────────────────────────────────────────
-    private readonly List<string>  _log           = new List<string>();
-    private Vector2                _logScroll     = Vector2.zero;
-    private const int              MaxLogLines    = 40;
+    private readonly List<string> _log = new List<string>();
+    private Vector2 _logScroll = Vector2.zero;
+    private const int MaxLogLines = 40;
 
     // ── 仿真结果（Step3 收到后显示）──────────────────────────────────
     private string _simResultText = "（尚未运行）";
@@ -45,20 +54,20 @@ public class TempExperimentUI : MonoBehaviour
     private string _observeText = "（尚未观测）";
 
     // ── IMGUI 布局常量 ────────────────────────────────────────────────
-    private const float PanelW    = 340f;
-    private const float PanelH    = 580f;
-    private const float LogW      = 360f;
-    private const float LogH      = 400f;
-    private const float BtnH      = 34f;
-    private const float FieldH    = 24f;
-    private const float Pad       = 8f;
+    private const float PanelW = 340f;
+    private const float PanelH = 580f;
+    private const float LogW = 360f;
+    private const float LogH = 400f;
+    private const float BtnH = 34f;
+    private const float FieldH = 24f;
+    private const float Pad = 8f;
 
     // ── GUIStyle 缓存（避免每帧 new）─────────────────────────────────
     private GUIStyle _styleTitle;
     private GUIStyle _styleStep;
     private GUIStyle _styleLog;
     private GUIStyle _styleError;
-    private bool     _stylesReady = false;
+    private bool _stylesReady = false;
 
     // ══════════════════════════════════════════════════════════════════
     // 生命周期
@@ -86,34 +95,51 @@ public class TempExperimentUI : MonoBehaviour
         if (_ctrl != null) UnbindEvents();
     }
 
+    private void Update()//update仅用于监听滚轮输入，其他状态更新通过事件驱动实现
+    {
+        // 仅在 Step1 / Step2 阶段响应滚轮（仿真运行后禁止修改高度）
+        if (_currentStep != ExperimentStep.Step1_Prepare &&
+            _currentStep != ExperimentStep.Step2_SetParam)
+            return;
+
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (Mathf.Abs(scroll) < 1e-5f) return;
+
+        // 将原始滚轮值（约 ±0.1）转换为高度增量，路由给控制器实现
+        float delta = scroll * scrollHeightStep * 10f;
+        _ctrl?.AdjustStartHeightByScroll(delta);
+    }
+
     // ══════════════════════════════════════════════════════════════════
     // 事件绑定
     // ══════════════════════════════════════════════════════════════════
 
     private void BindEvents()
     {
-        _ctrl.OnStepEntered     += OnStepEntered;
-        _ctrl.OnParamLoaded     += OnParamLoaded;
-        _ctrl.OnParamError      += OnParamError;
+        _ctrl.OnStepEntered += OnStepEntered;
+        _ctrl.OnParamLoaded += OnParamLoaded;
+        _ctrl.OnParamError += OnParamError;
         _ctrl.OnSimulationReady += OnSimulationReady;
-        _ctrl.OnObserveData     += OnObserveData;
-        _ctrl.OnPaused          += OnPaused;
-        _ctrl.OnResumed         += OnResumed;
-        _ctrl.OnReset           += OnReset;
-        _ctrl.OnFlowError       += OnFlowError;
+        _ctrl.OnObserveData += OnObserveData;
+        _ctrl.OnPaused += OnPaused;
+        _ctrl.OnResumed += OnResumed;
+        _ctrl.OnReset += OnReset;
+        _ctrl.OnFlowError += OnFlowError;
+        _ctrl.OnStartHeightChanged += OnStartHeightChanged;
     }
 
     private void UnbindEvents()
     {
-        _ctrl.OnStepEntered     -= OnStepEntered;
-        _ctrl.OnParamLoaded     -= OnParamLoaded;
-        _ctrl.OnParamError      -= OnParamError;
+        _ctrl.OnStepEntered -= OnStepEntered;
+        _ctrl.OnParamLoaded -= OnParamLoaded;
+        _ctrl.OnParamError -= OnParamError;
         _ctrl.OnSimulationReady -= OnSimulationReady;
-        _ctrl.OnObserveData     -= OnObserveData;
-        _ctrl.OnPaused          -= OnPaused;
-        _ctrl.OnResumed         -= OnResumed;
-        _ctrl.OnReset           -= OnReset;
-        _ctrl.OnFlowError       -= OnFlowError;
+        _ctrl.OnObserveData -= OnObserveData;
+        _ctrl.OnPaused -= OnPaused;
+        _ctrl.OnResumed -= OnResumed;
+        _ctrl.OnReset -= OnReset;
+        _ctrl.OnFlowError -= OnFlowError;
+        _ctrl.OnStartHeightChanged -= OnStartHeightChanged;
     }
 
     // ── 事件回调 ─────────────────────────────────────────────────────
@@ -126,12 +152,12 @@ public class TempExperimentUI : MonoBehaviour
 
     private void OnParamLoaded(float v, float angle, Vector3 dir, Vector3 pos, float dt, float T)
     {
-        _inputVelocity  = v.ToString("F2");
-        _inputAngle     = angle.ToString("F1");
-        _inputDirX      = dir.x.ToString("F2");
-        _inputDirZ      = dir.z.ToString("F2");
-        _inputStartY    = pos.y.ToString("F2");
-        _inputTimeStep  = dt.ToString("F3");
+        _inputVelocity = v.ToString("F2");
+        _inputAngle = angle.ToString("F1");
+        _inputDirX = dir.x.ToString("F2");
+        _inputDirZ = dir.z.ToString("F2");
+        _inputStartY = pos.y.ToString("F2");
+        _inputTimeStep = dt.ToString("F3");
         _inputTotalTime = T.ToString("F1");
         AddLog($"📥 参数已加载：v={v} θ={angle}° dir=({dir.x},{dir.z}) Y={pos.y}");
     }
@@ -172,17 +198,26 @@ public class TempExperimentUI : MonoBehaviour
 
     private void OnReset()
     {
-        _currentStep    = ExperimentStep.Step1_Prepare;
-        _runState       = ExperimentRunState.Idle;
-        _isPaused       = false;
-        _simResultText  = "（尚未运行）";
-        _observeText    = "（尚未观测）";
+        _currentStep = ExperimentStep.Step1_Prepare;
+        _runState = ExperimentRunState.Idle;
+        _isPaused = false;
+        _simResultText = "（尚未运行）";
+        _observeText = "（尚未观测）";
         AddLog("🔄 实验已重置，回到 Step1");
     }
 
     private void OnFlowError(string msg)
     {
         AddLog($"❌ 流程错误：{msg}");
+    }
+
+    /// <summary>
+    /// 滚轮调整高度后，控制器回调此方法，同步更新输入框显示。
+    /// </summary>
+    private void OnStartHeightChanged(float newY)
+    {
+        _inputStartY = newY.ToString("F2");
+        AddLog($"🖱️ 滚轮 → 起点高度：{newY:F2} m");
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -247,11 +282,11 @@ public class TempExperimentUI : MonoBehaviour
         // 各步骤专属操作
         switch (_currentStep)
         {
-            case ExperimentStep.Step1_Prepare:  DrawStep1(); break;
-            case ExperimentStep.Step2_SetParam:  DrawStep2(); break;
-            case ExperimentStep.Step3_RunSim:    DrawStep3(); break;
-            case ExperimentStep.Step4_Observe:   DrawStep4(); break;
-            case ExperimentStep.Step5_Finish:    DrawStep5(); break;
+            case ExperimentStep.Step1_Prepare: DrawStep1(); break;
+            case ExperimentStep.Step2_SetParam: DrawStep2(); break;
+            case ExperimentStep.Step3_RunSim: DrawStep3(); break;
+            case ExperimentStep.Step4_Observe: DrawStep4(); break;
+            case ExperimentStep.Step5_Finish: DrawStep5(); break;
         }
     }
 
@@ -347,6 +382,11 @@ public class TempExperimentUI : MonoBehaviour
         _inputStartY = GUILayout.TextField(_inputStartY, GUILayout.Height(FieldH));
         GUILayout.EndHorizontal();
 
+        // 滚轮提示
+        GUI.color = new Color(0.7f, 1f, 0.7f);
+        GUILayout.Label("  ↑↓ 鼠标滚轮可快速调节起点高度", EditorLabel());
+        GUI.color = Color.white;
+
         GUILayout.BeginHorizontal();
         GUILayout.Label("时间步长 (s):", GUILayout.Width(110));
         _inputTimeStep = GUILayout.TextField(_inputTimeStep, GUILayout.Height(FieldH));
@@ -416,7 +456,7 @@ public class TempExperimentUI : MonoBehaviour
         GUI.color = Color.green;
         if (GUILayout.Button("🎉 完成，再来一次", GUILayout.Height(BtnH + 6)))
             DispatchConfirmFinish();
-        GUI.color = Color.white;                
+        GUI.color = Color.white;
     }
 
     // ── 调度器：将 UI 操作路由到 Controller（确保事件链完整）
@@ -484,12 +524,12 @@ public class TempExperimentUI : MonoBehaviour
         if (_ctrl == null) return;
 
         bool valid = true;
-        float.TryParse(_inputVelocity,  out float v);
-        float.TryParse(_inputAngle,     out float angle);
-        float.TryParse(_inputDirX,      out float dx);
-        float.TryParse(_inputDirZ,      out float dz);
-        float.TryParse(_inputStartY,    out float sy);
-        float.TryParse(_inputTimeStep,  out float dt);
+        float.TryParse(_inputVelocity, out float v);
+        float.TryParse(_inputAngle, out float angle);
+        float.TryParse(_inputDirX, out float dx);
+        float.TryParse(_inputDirZ, out float dz);
+        float.TryParse(_inputStartY, out float sy);
+        float.TryParse(_inputTimeStep, out float dt);
         float.TryParse(_inputTotalTime, out float T);
 
         // 简单防守：非法或缺省值警告
@@ -503,12 +543,12 @@ public class TempExperimentUI : MonoBehaviour
         if (!valid) return;
 
         _ctrl.SetParam(
-            velocity:      v,
-            angle:         angle,
-            direction:     new Vector3(dx, 0f, dz),
+            velocity: v,
+            angle: angle,
+            direction: new Vector3(dx, 0f, dz),
             startPosition: new Vector3(0f, sy, 0f),
-            timeStep:      dt,
-            totalTime:     T);
+            timeStep: dt,
+            totalTime: T);
 
         AddLog($"📤 参数写入：v={v}  θ={angle}°  dir=({dx},{dz})  Y={sy}  dt={dt}  T={T}");
     }
@@ -527,31 +567,31 @@ public class TempExperimentUI : MonoBehaviour
 
     private static string StepName(ExperimentStep s) => s switch
     {
-        ExperimentStep.Step1_Prepare   => "Step1 准备",
-        ExperimentStep.Step2_SetParam  => "Step2 参数",
-        ExperimentStep.Step3_RunSim    => "Step3 仿真",
-        ExperimentStep.Step4_Observe   => "Step4 观察",
-        ExperimentStep.Step5_Finish    => "Step5 结束",
-        _                              => s.ToString()
+        ExperimentStep.Step1_Prepare => "Step1 准备",
+        ExperimentStep.Step2_SetParam => "Step2 参数",
+        ExperimentStep.Step3_RunSim => "Step3 仿真",
+        ExperimentStep.Step4_Observe => "Step4 观察",
+        ExperimentStep.Step5_Finish => "Step5 结束",
+        _ => s.ToString()
     };
 
     private static string StepShortName(ExperimentStep s) => s switch
     {
-        ExperimentStep.Step1_Prepare   => "1.准备",
-        ExperimentStep.Step2_SetParam  => "2.参数",
-        ExperimentStep.Step3_RunSim    => "3.仿真",
-        ExperimentStep.Step4_Observe   => "4.观察",
-        ExperimentStep.Step5_Finish    => "5.结束",
-        _                              => s.ToString()
+        ExperimentStep.Step1_Prepare => "1.准备",
+        ExperimentStep.Step2_SetParam => "2.参数",
+        ExperimentStep.Step3_RunSim => "3.仿真",
+        ExperimentStep.Step4_Observe => "4.观察",
+        ExperimentStep.Step5_Finish => "5.结束",
+        _ => s.ToString()
     };
 
     private static string RunStateName(ExperimentRunState s) => s switch
     {
-        ExperimentRunState.Idle     => "空闲 💤",
-        ExperimentRunState.Running  => "运行中 🟢",
-        ExperimentRunState.Paused   => "已暂停 🟡",
+        ExperimentRunState.Idle => "空闲 💤",
+        ExperimentRunState.Running => "运行中 🟢",
+        ExperimentRunState.Paused => "已暂停 🟡",
         ExperimentRunState.Finished => "已完成 ✅",
-        _                           => s.ToString()
+        _ => s.ToString()
     };
 
     // ── GUIStyle 初始化 ───────────────────────────────────────────────
@@ -562,29 +602,29 @@ public class TempExperimentUI : MonoBehaviour
 
         _styleTitle = new GUIStyle(GUI.skin.label)
         {
-            fontSize  = 14,
+            fontSize = 14,
             fontStyle = FontStyle.Bold,
-            normal    = { textColor = Color.white }
+            normal = { textColor = Color.white }
         };
 
         _styleStep = new GUIStyle(GUI.skin.label)
         {
-            fontSize  = 12,
+            fontSize = 12,
             fontStyle = FontStyle.Bold,
-            normal    = { textColor = Color.cyan }
+            normal = { textColor = Color.cyan }
         };
 
         _styleLog = new GUIStyle(GUI.skin.label)
         {
-            fontSize  = 11,
-            wordWrap  = true,
-            normal    = { textColor = new Color(0.85f, 0.85f, 0.85f) }
+            fontSize = 11,
+            wordWrap = true,
+            normal = { textColor = new Color(0.85f, 0.85f, 0.85f) }
         };
 
         _styleError = new GUIStyle(GUI.skin.label)
         {
             fontSize = 11,
-            normal   = { textColor = Color.red }
+            normal = { textColor = Color.red }
         };
 
         _stylesReady = true;
@@ -595,7 +635,7 @@ public class TempExperimentUI : MonoBehaviour
         var s = new GUIStyle(GUI.skin.label)
         {
             fontSize = 11,
-            normal   = { textColor = new Color(0.75f, 0.75f, 0.75f) },
+            normal = { textColor = new Color(0.75f, 0.75f, 0.75f) },
             wordWrap = true
         };
         return s;

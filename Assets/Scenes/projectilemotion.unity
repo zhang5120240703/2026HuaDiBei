@@ -682,7 +682,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1684577266}
   - component: {fileID: 1684577265}
-  - component: {fileID: 1684577267}
   - component: {fileID: 1684577269}
   - component: {fileID: 1684577268}
   - component: {fileID: 1684577270}
@@ -720,18 +719,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1684577267
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1684577263}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 35fb104b948e83143b8450de8f6acf60, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &1684577268
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -749,7 +736,7 @@ MonoBehaviour:
   defaultDirection: {x: 0, y: 0, z: 1}
   defaultStartPosition: {x: 4700, y: 10, z: -2}
   defaultTimeStep: 0.02
-  defaultTotalTime: 5
+  defaultTotalTime: 10
   ballController: {fileID: 0}
 --- !u!114 &1684577269
 MonoBehaviour:
@@ -763,6 +750,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ffcc50eab2894204da3cf8ea0ca52359, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scrollHeightStep: 0.5
 --- !u!114 &1684577270
 MonoBehaviour:
   m_ObjectHideFlags: 0

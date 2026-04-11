@@ -18,7 +18,7 @@ using UnityEngine;
 ///   - UserActionManager（获取 FlowController 引用）
 /// </summary>
 [RequireComponent(typeof(LineRenderer))]
-[RequireComponent(typeof(AudioSource))] 
+[RequireComponent(typeof(AudioSource))]
 /// <summary>
 /// 抛体小球表现控制器，负责小球动画、轨迹线渲染、落地音效等。
 /// </summary>
@@ -62,7 +62,7 @@ public class ProjectileBallController : MonoBehaviour
 
     // ── 私有成员 ─────────────────────────────────────────────────────
     // 轨迹线渲染组件
-    private LineRenderer _lineRenderer; 
+    private LineRenderer _lineRenderer;
     // 动画协程句柄
     private Coroutine _animationCoroutine;
     // 小球初始位置（用于重置）
@@ -290,6 +290,37 @@ public class ProjectileBallController : MonoBehaviour
         _isPaused = false;
         _isPlaying = false;
         Debug.Log("[ProjectileBallController] 小球已重置到初始位置。");
+    }
+
+    /// <summary>
+    /// 在不触发仿真的前提下，将小球预览到新的高度位置（Y 轴）。
+    ///
+    /// 调用时机：由 ProjectileExperimentController.AdjustStartHeightByScroll() 在
+    ///           Step1/Step2 阶段调用，为用户提供实时的高度调节视觉反馈。
+    ///
+    /// 安全性：
+    ///   • 动画播放中（_isPlaying）时忽略调用，避免与协程位置争抢
+    ///   • 只改变 Y 分量，X/Z 保持原始 _originPosition，确保球不偏移水平初始位置
+    ///   • 同时更新 _originPosition.y，使 ResetBall() 之后仍能回到正确高度
+    /// </summary>
+    /// <param name="newY">目标高度（世界坐标 Y，单位：米）</param>
+    public void SetPreviewHeight(float newY)
+    {
+        // 动画运行中不响应：协程驱动位置，贸然修改会造成跳帧
+        if (_isPlaying)
+        {
+            Debug.LogWarning("[ProjectileBallController] 动画播放中，忽略 SetPreviewHeight 调用。");
+            return;
+        }
+
+        // 仅更新 Y 分量，X/Z 保持 _originPosition 的值
+        Vector3 preview = new Vector3(_originPosition.x, newY, _originPosition.z);
+        transform.position = preview;
+
+        // 同步 _originPosition.y，保证 ResetBall() 能回到本次预览高度
+        _originPosition.y = newY;
+
+        Debug.Log($"[ProjectileBallController] 小球预览高度 → Y = {newY:F2} m");
     }
 
     // ── 核心动画协程 ─────────────────────────────────────────────────

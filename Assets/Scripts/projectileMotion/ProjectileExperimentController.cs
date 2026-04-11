@@ -108,6 +108,13 @@ public class ProjectileExperimentController : MonoBehaviour
     /// <summary>流程跳转失败或其他流程错误，string = 错误描述</summary>
     public event Action<string> OnFlowError;
 
+    /// <summary>
+    /// 滚轮调整起点高度后触发，float = 新的 Y 坐标（已夹到合法范围）。
+    /// UI 层订阅此事件以同步输入框显示；ProjectileBallController 通过
+    /// SetPreviewHeight 同步小球预览位置（由本类内部直接调用，不通过事件）。
+    /// </summary>
+    public event Action<float> OnStartHeightChanged;
+
     // ══════════════════════════════════════════════════════════════════
     // 运行时参数（由 UI 通过 SetParam 写入）
     // ══════════════════════════════════════════════════════════════════
@@ -147,6 +154,12 @@ public class ProjectileExperimentController : MonoBehaviour
 
     // 是否正处于 Step3 仿真运行阶段（用于 Pause/Resume 时额外控制球的动画）
     private bool _inStep3Sim;
+
+    // ── 滚轮高度调节常量 ─────────────────────────────────────────────
+    /// <summary>起点高度最小值（m），必须高于地面（GroundY = 0）</summary>
+    private const float HeightScrollMin = 0.1f;
+    /// <summary>起点高度最大值（m），防止调节过高脱出实验场景</summary>
+    private const float HeightScrollMax = 50f;
 
     // ══════════════════════════════════════════════════════════════════
     // 生命周期
@@ -388,6 +401,41 @@ public class ProjectileExperimentController : MonoBehaviour
         // 强制解除暂停，让等待中的协程能够检测到 reset 标志并安全退出
         _isPaused = false;
         Debug.Log("[ExperimentController] 🔄 收到重置请求，正在中断当前流程...");
+    }
+
+    // ─── 滚轮高度调节接口 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// [Step1/Step2 · UI调用] 通过鼠标滚轮调节小球发射起点的 Y 坐标。
+    ///
+    /// 调用方（TempExperimentUI.Update）负责：
+    ///   • 检测 Input.GetAxis("Mouse ScrollWheel")
+    ///   • 乘以灵敏度系数后传入 delta
+    ///   • 只在 Step1/Step2 阶段调用（步骤过滤在 UI 侧完成）
+    ///
+    /// 本方法负责：
+    ///   1. 将新高度夹到 [HeightScrollMin, HeightScrollMax]
+    ///   2. 写入 _startPosition.y
+    ///   3. 触发 OnStartHeightChanged 事件（UI 同步输入框显示）
+    ///   4. 调用 ballController.SetPreviewHeight() 同步小球预览位置
+    /// </summary>
+    /// <param name="delta">高度增量（米），正值向上，负值向下</param>
+    public void AdjustStartHeightByScroll(float delta)
+    {
+        float newY = Mathf.Clamp(_startPosition.y + delta, HeightScrollMin, HeightScrollMax);
+
+        // 若已经到达边界且增量方向相同，直接跳过（避免无意义触发）
+        if (Mathf.Approximately(newY, _startPosition.y)) return;
+
+        _startPosition.y = newY;
+
+        // 通知 UI 同步输入框
+        OnStartHeightChanged?.Invoke(newY);
+
+        // 通知小球控制器更新预览位置（视觉反馈，不触发仿真）
+        ballController?.SetPreviewHeight(newY);
+
+        Debug.Log($"[ExperimentController] 🖱️ 滚轮调整起点高度 → Y = {newY:F2} m");
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -764,10 +812,12 @@ public class ProjectileExperimentController : MonoBehaviour
  ║ Step1 准备   ║ ConfirmPrepare()     ║ OnStepEntered(Step1_Prepare)      ║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
  ║ Step2 参数   ║ SetParam(...)        ║ OnStepEntered(Step2_SetParam)     ║
- ║              ║ ConfirmParam()       ║ OnParamLoaded(v,θ,dir,pos,dt,T)   ║
+ ║ (滚轮调节小球高度
+   不适合用协程，在UI
+侧通过update实现)             ║ ConfirmParam()       ║ OnParamLoaded(v,θ,dir,pos,dt,T)   ║
  ║              ║                      ║ OnParamError(errorMsg)            ║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
- ║ Step3 仿真   ║ （无需确认，自动）   ║ OnStepEntered(Step3_RunSim)       ║
+ ║ Step3 仿真   ║ （无需确认，自动）   ║ OnStepEntered(Step3_RunSim)          ║
  ║              ║                      ║ OnSimulationReady(snapshot,points)║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
  ║ Step4 观察   ║ ConfirmObserved()    ║ OnStepEntered(Step4_Observe)      ║
