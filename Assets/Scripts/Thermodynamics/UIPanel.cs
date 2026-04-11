@@ -1,10 +1,12 @@
-﻿using UnityEngine;
-using UnityEngine.UI;
+﻿using System.Diagnostics;
 using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 public class UIPanel : MonoBehaviour
 {
     // 引用
+    public CylinderController cylinderController;
     public IdealGasSimulation gasSimulation;
     public DataCollector dataCollector;
     
@@ -43,6 +45,7 @@ public class UIPanel : MonoBehaviour
         //isochoricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isochoric));
 
         // 温度输入事件
+
         temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
         
         // 控制按钮事件
@@ -56,6 +59,7 @@ public class UIPanel : MonoBehaviour
         UpdateStatusText();
         UpdateProgressText();
         HideError();
+        SetTemperatureSliderEnable(IdealGasSimulation.Instance.GetCurrentProcess());
     }
     
     public void UpdateStatusDisplay(float pressure, float volume, float temperature)
@@ -80,13 +84,29 @@ public class UIPanel : MonoBehaviour
         temperatureText.text = "温度: " + value.ToString("F2") + " K";
     }
 
+    //等温状态不显示Slider
+    private void SetTemperatureSliderEnable(IdealGasSimulation.ProcessType process)
+    {
+        bool isActive=process==IdealGasSimulation.ProcessType.Isothermal?false:true;
+        
+        temperatureSlider.gameObject.SetActive(isActive);
+    }
+
+
+
+
     public void SetProcess(int process)
     {
         gasSimulation.SetProcess((IdealGasSimulation.ProcessType)process);
+        cylinderController.SetCurrentProcess((IdealGasSimulation.ProcessType)process);
+        SetTemperatureSliderEnable((IdealGasSimulation.ProcessType)process);
         UpdateProcessText();
         ResetExperiment();
     }
     
+
+
+
     private void UpdateProcessText()
     {
         switch (gasSimulation.currentProcess)

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
@@ -82,6 +82,7 @@ public class UIManager : MonoBehaviour
         gasSimulation.SetProcess(process);
         ResetUI();
     }
+
     
     // 获取当前实验步骤
     public int GetCurrentStep()

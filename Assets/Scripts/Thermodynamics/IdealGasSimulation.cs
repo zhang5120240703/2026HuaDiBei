@@ -30,7 +30,7 @@ public class IdealGasSimulation : MonoBehaviour
     
     // 体积范围限制
     private const float minVolume = 0.0f;
-    private const float maxVolume = 2.0f;
+    private const float maxVolume = 1.8f;
     
     // 温度范围限制
     private const float minTemperature = 100.0f;
@@ -64,6 +64,7 @@ public class IdealGasSimulation : MonoBehaviour
         temperature = 300.0f;
         UpdatePressure();
         SetProcess(ProcessType.Isothermal);
+
     }
     
     public void SetProcess(ProcessType process)
@@ -207,7 +208,8 @@ public class IdealGasSimulation : MonoBehaviour
     public float GetMaxTemperature() { return maxTemperature; }
     public float GetMinPressure() { return minPressure; }
     public float GetMaxPressure() { return maxPressure; }
-    
+    public ProcessType GetCurrentProcess() { return currentProcess; }
+
     // 计算理论值（用于误差分析）
     public float CalculateTheoreticalPressure(float targetVolume, float targetTemperature)
     {
