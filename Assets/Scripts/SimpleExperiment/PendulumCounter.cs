@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// 单摆周期计数器（方向反转计数版 —— 最稳定）
 /// 逻辑：摆球运动方向改变 → 计数半周期 → 2次方向变 = 1个完整周期
 /// 优化：仅在摆球被拖动释放后开始计数 + 统计10个周期总时间
-/// 新增：基于固定g=10的理论周期对比
+/// 新增：基于固定g=9.8的理论周期对比
 /// </summary>
 public class PendulumCounter : MonoBehaviour
 {
@@ -17,7 +17,7 @@ public class PendulumCounter : MonoBehaviour
     public float pendulumLength = 2f;
 
     [Header("固定重力加速度")]
-    public float fixedG = 10f; // 固定为10
+    public float fixedG = 9.8f; // 固定为9.8
     [HideInInspector] public float theoreticalPeriod; // 理论周期
 
     [Header("计数设置")]
@@ -28,7 +28,7 @@ public class PendulumCounter : MonoBehaviour
     public int totalCycles = 0;
     public float currentPeriod = 0;
     public float averagePeriod = 0;
-    public float calculatedG = 0; // 固定为10
+    public float calculatedG = 0; // 固定为9.8
     public float totalTimeFor10Cycles = 0; // 10个周期总时间
 
     [Header("UI绑定")]
@@ -62,9 +62,9 @@ public class PendulumCounter : MonoBehaviour
         lowestPos = ballRb.position;
         lastChangeTime = Time.time;
 
-        // 优化阻尼，匹配g=10的物理表现
-        ballRb.angularDrag = 0.05f;
-        ballRb.drag = 0.001f;
+        // 优化阻尼，匹配g=9.8的物理表现
+        ballRb.angularDrag = 0.08f;
+        ballRb.drag = 0.002f;
 
         // 初始化UI
         UpdateUIText();
@@ -125,7 +125,7 @@ public class PendulumCounter : MonoBehaviour
             foreach (var t in periodList) averagePeriod += t;
             averagePeriod /= periodList.Count;
 
-            // 强制g=10，不再通过周期反算
+            // 强制g=9.8，不再通过周期反算
             calculatedG = fixedG;
 
             // 计算10个周期总时间（最多统计前10个）
@@ -140,7 +140,7 @@ public class PendulumCounter : MonoBehaviour
     }
 
     /// <summary>
-    /// 基于固定g=10计算理论周期
+    /// 基于固定g=9.8计算理论周期
     /// </summary>
     public void CalculateTheoreticalPeriod()
     {
@@ -183,7 +183,7 @@ public class PendulumCounter : MonoBehaviour
         totalCycles = 0;
         currentPeriod = 0;
         averagePeriod = 0;
-        calculatedG = fixedG; // 重置后仍固定为10
+        calculatedG = fixedG; // 重置后仍固定为9.8
         totalTimeFor10Cycles = 0;
         dirChangeCount = 0;
         lastDir = 0;
@@ -212,7 +212,7 @@ public class PendulumCounter : MonoBehaviour
         // 新增：显示理论周期
         if (theoreticalPeriodText != null)
         {
-            theoreticalPeriodText.text = $"理论周期：{theoreticalPeriod:F2}s (g=10)";
+            theoreticalPeriodText.text = $"理论周期：{theoreticalPeriod:F2}s (g=9.80)";
         }
     }
 

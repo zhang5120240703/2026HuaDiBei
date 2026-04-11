@@ -8,11 +8,11 @@ public class Pendulum : MonoBehaviour
 
     [Header("单摆参数")]
     public float pendulumLength = 2f; // 摆长（单位：米）
-    [HideInInspector] public float fixedG = 10f; // 固定重力加速度=10
-    [HideInInspector] public float theoreticalPeriod; // 理论周期（基于g=10计算）
+    [HideInInspector] public float fixedG = 9.8f; // 固定重力加速度=9.8
+    [HideInInspector] public float theoreticalPeriod; // 理论周期（基于g=9.8计算）
 
     [Header("实验结果")]
-    public float calculatedG;         // 兼容原有显示，固定为10
+    public float calculatedG;         // 兼容原有显示，固定为9.8
 
     private Camera mainCam;
     private bool isDragging = false;
@@ -49,11 +49,11 @@ public class Pendulum : MonoBehaviour
         hinge.autoConfigureConnectedAnchor = false;
         hinge.connectedAnchor = Vector3.zero;
 
-        // 5. 配置摆球（优化物理参数，匹配g=10的周期）
+        // 5. 配置摆球（优化物理参数，匹配g=9.8的周期）
         ball.useGravity = true;
         ball.isKinematic = false;
-        ball.angularDrag = 0.05f; // 降低阻尼，减少周期偏差
-        ball.drag = 0.001f;       // 极低线性阻尼
+        ball.angularDrag = 0.08f; // 降低阻尼，减少周期偏差
+        ball.drag = 0.002f;       // 极低线性阻尼
         ball.mass = 1f;
 
         // 6. 初始化摆球到竖直下垂
@@ -66,8 +66,7 @@ public class Pendulum : MonoBehaviour
 
     void Update()
     {
-        //UpdateLineVisual();
-
+        
         // 鼠标左键按下
         if (Input.GetMouseButtonDown(0))
         {
@@ -138,45 +137,17 @@ public class Pendulum : MonoBehaviour
     }
 
     /// <summary>
-    /// 基于固定g=10计算理论周期
+    /// 基于固定g=9.8计算理论周期
     /// </summary>
     [ContextMenu("计算理论周期")]
     public void CalculateTheoreticalPeriod()
     {
         theoreticalPeriod = 2 * Mathf.PI * Mathf.Sqrt(pendulumLength / fixedG);
-        calculatedG = fixedG; // 强制固定为10
-        Debug.Log($" 单摆参数（g固定为10）：");
+        calculatedG = fixedG; // 强制固定为9.8
+        Debug.Log($" 单摆参数（g固定为9.8）：");
         Debug.Log($"   摆长 L = {pendulumLength:F2} m");
         Debug.Log($"   理论周期 T = {theoreticalPeriod:F2} s");
         Debug.Log($"   重力加速度 g = {calculatedG:F2} m/s²");
     }
-
-    /*void UpdateLineVisual()
-    {
-        if (line == null || ball == null) return;
-
-        line.position = Vector3.Lerp(transform.position, ball.position, 0.5f);
-        Vector3 lineDir = ball.position - transform.position;
-        line.rotation = Quaternion.LookRotation(lineDir) * Quaternion.Euler(90f, 0f, 0f);
-        float actualLength = Vector3.Distance(transform.position, ball.position);
-        line.localScale = new Vector3(0.08f, actualLength / 2f, 0.08f);
-    }
-    
-    [ContextMenu("复位单摆")]
-    public void ResetPendulum()
-    {
-        isDragging = false;
-        ball.isKinematic = false;
-        ball.velocity = Vector3.zero;
-        ball.angularVelocity = Vector3.zero;
-        ball.transform.position = transform.position - Vector3.up * pendulumLength;
-
-        //  复位时也校准轴心
-        if (hinge != null)
-        {
-            Vector3 correctAnchor = transform.position - ball.transform.position;
-            hinge.anchor = correctAnchor;
-        }
-    }
-    */
+   
 }
