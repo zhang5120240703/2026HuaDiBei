@@ -17,8 +17,11 @@ public class UIManager : MonoBehaviour
         cylinderController.OnVolumeRangeExceeded += OnVolumeRangeExceeded;
         dataCollector.OnDataCollected += OnDataCollected;
         dataCollector.OnAnalysisCompleted += OnAnalysisCompleted;
+
     }
+
     
+
     private void OnStateChanged(float pressure, float volume, float temperature)
     {
         // 状态变化时更新UI

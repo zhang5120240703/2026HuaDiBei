@@ -237,7 +237,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     {
         float normalizedPosition = Mathf.InverseLerp(-cylinderHeight / 2, cylinderHeight / 2, pistonY);
         float volume = Mathf.Lerp(maxHeight, minHeight, normalizedPosition);
-        return Mathf.Clamp(volume, minHeight, maxHeight);
+        return Mathf.Clamp(volume, minHeight + minVolumeEpsilon, maxHeight);
     }
 
     // 根据给定体积返回对应的活塞Y位置（不修改实际位置）
