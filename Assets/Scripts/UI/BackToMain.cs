@@ -1,9 +1,9 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class BackButton : MonoBehaviour
+public class BackToMain : MonoBehaviour
 {
-    public void OnClickBack()
+    public void OnClick()
     {
         SceneManager.LoadScene("MainScene");
     }
