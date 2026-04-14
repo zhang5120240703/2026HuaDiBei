@@ -1,11 +1,11 @@
-Shader "Custom/DoubleSlitInterference"
+Shader "Custom/DoubleSlitInterference_LUT"
 {
     Properties
     {
-        _Wavelength ("Wavelength (nm)", Range(380, 780)) = 550
-        _SlitDistance ("Slit Distance d (mm)", Range(0.01, 1.0)) = 0.2
-        _SlitWidth ("Slit Width a (mm)", Range(0.001, 0.5)) = 0.05
-        _ScreenDistance ("Screen Distance l (m)", Range(0.1, 10.0)) = 1.0
+        _LUT ("Interference LUT", 2D) = "white" {}
+        _VisualScale ("Visual Scale", Range(0.1, 50.0)) = 5.0
+        _Aspect ("Aspect Ratio (Width/Height)", Range(0.1, 4.0)) = 1.78
+        _MaxRange ("Max Physical Range", Float) = 50.0 // 必须与C#脚本中的 maxRange 保持一致
     }
     SubShader
     {
@@ -27,74 +27,40 @@ Shader "Custom/DoubleSlitInterference"
 
             struct v2f
             {
-                float2 uv : TEXCOORD0;
+                half2 uv : TEXCOORD0; 
                 float4 vertex : SV_POSITION;
             };
 
-            float _Wavelength;
-            float _SlitDistance;
-            float _SlitWidth;
-            float _ScreenDistance;
+            sampler2D _LUT;
+            half _VisualScale;
+            half _Aspect;
+            half _MaxRange;
 
             v2f vert (appdata v)
             {
                 v2f o;
-                // 将顶点从模型空间转换到裁剪空间[4](@ref)
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = v.uv;
                 return o;
             }
 
-            // 简易的波长转RGB颜色函数，使不同波长的光呈现不同颜色
-            float3 wavelengthToRGB(float wl) 
-            {
-                float3 col = float3(0,0,0);
-                if(wl < 440) col = float3(-(wl-440)/(440-380), 0.0, 1.0);
-                else if(wl < 490) col = float3(0.0, (wl-440)/(490-440), 1.0);
-                else if(wl < 510) col = float3(0.0, 1.0, -(wl-510)/(510-490));
-                else if(wl < 580) col = float3((wl-510)/(580-510), 1.0, 0.0);
-                else if(wl < 645) col = float3(1.0, -(wl-645)/(645-580), 0.0);
-                else col = float3(1.0, 0.0, 0.0);
-                return col;
-            }
-
             fixed4 frag (v2f i) : SV_Target
             {
-                // 将UV坐标(0~1)映射到物理屏幕位置，以中心为0点
-                float x = (i.uv.x - 0.5) * 2.0;
-                float y = (i.uv.y - 0.5) * 2.0;
-
-                // 单位换算与缩放因子(为了在Shader中呈现合理的视觉效果)
-                float lambda = _Wavelength * 1e-6; // nm转mm
-                float d = _SlitDistance;
-                float a = _SlitWidth;
-                float l = _ScreenDistance * 1000;   // m转mm
+                // 1. 计算缩放后的物理坐标 x
+                half physicalX = (i.uv.x - 0.5) * _Aspect * _VisualScale;
                 
-                // 视觉缩放系数，让条纹肉眼可见
-                float scale = 5.0; 
-                x *= scale;
-
-                // 1. 双缝干涉计算
-                // 干涉强度 I_interference = cos^2(π * d * sinθ / λ)
-                // 当角度很小时，sinθ ≈ tanθ = x / l
-                float phase_interference = 3.1415926 * d * x / (lambda * l);
-                float intensity_interference = pow(cos(phase_interference), 2);
-
-                // 2. 单缝衍射计算（包络线）
-                // 衍射强度 I_diffraction = sinc^2(π * a * sinθ / λ)
-                float phase_diffraction = 3.1415926 * a * x / (lambda * l);
-                float intensity_diffraction = 1.0;
-                if(abs(phase_diffraction) > 0.001) {
-                    intensity_diffraction = pow(sin(phase_diffraction) / phase_diffraction, 2);
-                }
-
-                // 总光强 = 干涉强度 * 衍射包络
-                float intensity = intensity_interference * intensity_diffraction;
-
-                // 获取对应波长的光色
-                float3 col = wavelengthToRGB(_Wavelength);
+                // 2. 将物理坐标映射到 0~1 以采样LUT纹理
+                half lutU = (physicalX / _MaxRange) * 0.5 + 0.5;
                 
-                return fixed4(col * intensity, 1.0);
+                // 3. 超出LUT覆盖范围的区域返回黑色
+                // 使用step函数代替if分支，更符合GPU流水线特性[6](@ref)
+                half validRange = step(0, lutU) * step(lutU, 1);
+                lutU = clamp(lutU, 0, 1); // 防止越界采样
+
+                // 4. 采样1D LUT (v坐标固定为0.5)
+                fixed4 col = tex2D(_LUT, float2(lutU, 0.5));
+                
+                return col * validRange;
             }
             ENDCG
         }
