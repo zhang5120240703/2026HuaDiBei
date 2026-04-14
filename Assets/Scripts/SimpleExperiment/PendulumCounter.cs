@@ -47,6 +47,30 @@ public class PendulumCounter : MonoBehaviour
     // 最低点
     private Vector3 lowestPos;
 
+    #region ===================== 【AI 实验数据接口】 =====================
+    /// <summary>
+    /// 获取已完成的完整周期数
+    /// </summary>
+    public int GetTotalCycles() => totalCycles;
+
+    /// <summary>
+    /// 获取最后一次周期的时间
+    /// 单位：秒(s)
+    /// </summary>
+    public float GetLastCycleTime() => currentPeriod;
+
+    /// <summary>
+    /// 获取所有记录的周期时间列表
+    /// 单位：秒(s)
+    /// </summary>
+    public float[] GetAllCycleRecords() => periodList.ToArray();
+
+    /// <summary>
+    /// 获取平均周期
+    /// 单位：秒(s)
+    /// </summary>
+    public float GetAverageCycle() => averagePeriod;
+    #endregion
     void Start()
     {
         if (ballRb == null)

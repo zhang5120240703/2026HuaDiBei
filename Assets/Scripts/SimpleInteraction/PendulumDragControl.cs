@@ -32,6 +32,31 @@ public class PendulumDragControl : MonoBehaviour
     private bool _isDraggingBall;
     private Plane _dragPlane;            // 拖拽平面（固定Z轴，仅XY）
 
+    #region ===================== 【AI 实验数据接口】 =====================
+    /// <summary>
+    /// 获取当前使用摆长
+    /// 单位：米(m)
+    /// </summary>
+    public float GetCurrentLength() => currentLength;
+
+    /// <summary>
+    /// 获取当前摆角
+    /// 单位：角度(deg)
+    /// </summary>
+    public float GetCurrentAngle() => currentAngle;
+
+    /// <summary>
+    /// 获取最大可设置摆长
+    /// 单位：米(m)
+    /// </summary>
+    public float GetMaxLength() => maxLength;
+
+    /// <summary>
+    /// 获取最小可设置摆长
+    /// 单位：米(m)
+    /// </summary>
+    public float GetMinLength() => minLength;
+    #endregion
     void Start()
     {
         // 初始化主相机
@@ -73,7 +98,7 @@ public class PendulumDragControl : MonoBehaviour
 
         HandleMouseDragAngle();   // 处理鼠标拖动角度
         UpdateCurrentAngle();     // 实时计算当前角度
-                                  // 移除原Update中的UpdatePendulumVisual()，改为：
+                                  
         if (!_isDraggingBall)
         {
             UpdatePendulumVisual(); // 非拖动时仍在Update更新
@@ -103,7 +128,7 @@ public class PendulumDragControl : MonoBehaviour
     }
     #endregion
 
-    #region 功能2：鼠标拖拽调整摆角（原有逻辑不变）
+    #region 功能2：鼠标拖拽调整摆角
     /// <summary>
     /// 处理鼠标拖拽行为，调整摆角
     /// </summary>
@@ -180,8 +205,19 @@ public class PendulumDragControl : MonoBehaviour
     void StopDrag()
     {
         _isDraggingBall = false;
+        Pendulum pendulum = GetComponent<Pendulum>();
+        if (pendulum != null && pendulum.hinge != null)
+        {
+            Vector3 correctAnchor = transform.position - pendulumBall.transform.position;
+            pendulum.hinge.anchor = correctAnchor;
+        }
         pendulumBall.isKinematic = false;
         Debug.Log($"停止拖拽 → 当前摆角：{currentAngle:F1}°");
+        PendulumCounter counter = FindObjectOfType<PendulumCounter>();
+        if (counter != null)
+        {
+            counter.ActivateSwingCount();
+        }
     }
 
     /// <summary>
@@ -209,7 +245,7 @@ public class PendulumDragControl : MonoBehaviour
         // 优化旋转计算，避免LookRotation的额外开销
         pendulumLine.rotation = Quaternion.FromToRotation(Vector3.up, lineDir);
         // 直接设置缩放，无插值
-        pendulumLine.localScale = new Vector3(0.08f, actualLen / 2f, 0.08f);
+        pendulumLine.localScale = new Vector3(0.08f, actualLen / 2f, 0.08f);//设置摆线直径
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
-﻿using UnityEngine;
-using TMPro;
+﻿using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 单摆实验结果验证脚本
@@ -26,6 +27,20 @@ public class PendulumExperimentJudge : MonoBehaviour
     public Color successColor = Color.green;
     public Color failColor = Color.red;
     public Color tipColor = Color.gray;
+
+    #region ===================== 【AI 实验数据接口】 =====================
+    /// <summary>
+    /// 获取用户输入的最终重力加速度
+    /// 单位：m/s²
+    /// </summary>
+    public float GetUserInputFinalG()
+    {
+        if (input_UserFinalG == null) return 0;
+        float.TryParse(input_UserFinalG.text, out float g);
+        return g;
+    }
+    #endregion
+
 
     void Start()
     {

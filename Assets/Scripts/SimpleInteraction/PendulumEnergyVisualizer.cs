@@ -38,6 +38,38 @@ public class PendulumEnergyVisualizer : MonoBehaviour
     private float _updateInterval = 0.02f;
     private float _lastUpdateTime;
 
+    #region ===================== 【AI 实验数据接口】 =====================
+    /// <summary>
+    /// 获取当前动能
+    /// 单位：焦耳(J)
+    /// </summary>
+    public float GetCurrentKinetic()
+    {
+        int latestIndex = (_bufferIndex - 1 + graphWidth) % graphWidth;
+        return _kineticEnergyBuffer[latestIndex];
+    }
+
+    /// <summary>
+    /// 获取当前势能
+    /// 单位：焦耳(J)
+    /// </summary>
+    public float GetCurrentPotential()
+    {
+        int latestIndex = (_bufferIndex - 1 + graphWidth) % graphWidth;
+        return _potentialEnergyBuffer[latestIndex];
+    }
+
+    /// <summary>
+    /// 获取当前总机械能
+    /// 单位：焦耳(J)
+    /// </summary>
+    public float GetTotalEnergy()
+    {
+        int latestIndex = (_bufferIndex - 1 + graphWidth) % graphWidth;
+        return _totalEnergyBuffer[latestIndex];
+    }
+    #endregion
+
     void Start()
     {
         // 强制开启RawImage，确保可见

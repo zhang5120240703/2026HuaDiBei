@@ -15,9 +15,28 @@ public class Pendulum : MonoBehaviour
     public float calculatedG;         // 兼容原有显示，固定为9.8
 
     private Camera mainCam;
-    private bool isDragging = false;
     public HingeJoint hinge;
 
+  
+    #region ===================== 【AI 实验数据接口】 =====================
+    /// <summary>
+    /// 获取当前摆长
+    /// 单位：米(m)
+    /// </summary>
+    public float GetPendulumLength() => pendulumLength;
+
+    /// <summary>
+    /// 获取固定重力加速度
+    /// 单位：m/s²
+    /// </summary>
+    public float GetGravityValue() => fixedG;
+
+    /// <summary>
+    /// 获取摆球当前世界坐标
+    /// 用于AI判断位置、姿态、是否正常摆动
+    /// </summary>
+    public Vector3 GetCurrentBallPosition() => ball != null ? ball.position : Vector3.zero;
+    #endregion
     void Start()
     {
         mainCam = Camera.main;
@@ -64,76 +83,10 @@ public class Pendulum : MonoBehaviour
         CalculateTheoreticalPeriod();
     }
 
+    
     void Update()
     {
-        
-        // 鼠标左键按下
-        if (Input.GetMouseButtonDown(0))
-        {
-            Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                if (hit.rigidbody == ball)
-                {
-                    isDragging = true;
-                    ball.isKinematic = true;
-                }
-            }
-        }
-
-        // 拖动中 —— 核心修改：使用 DragControl 的 currentLength 而非固定的 pendulumLength
-        // 拖动中 —— 核心修改：锁定Z轴 + 强制XY平面运动
-        if (isDragging)
-        {
-            Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
-            Plane dragPlane = new Plane(Vector3.forward, transform.position.z); // 悬挂点的Z平面
-
-            if (dragPlane.Raycast(ray, out float enterDistance))
-            {
-                Vector3 mouseWorldPos = ray.GetPoint(enterDistance);
-                // 关键：强制鼠标世界坐标的Z轴 = 悬挂点的Z轴，彻底锁死前后移动
-                mouseWorldPos.z = transform.position.z;
-
-                Vector3 dirToMouse = mouseWorldPos - transform.position;
-                // 同样锁死dirToMouse的Z轴
-                dirToMouse.z = 0;
-
-                if (dirToMouse.magnitude > 0.01f)
-                {
-                    // 改为获取 DragControl 的当前摆长
-                    PendulumDragControl dragControl = GetComponent<PendulumDragControl>();
-                    float currentLength = dragControl != null ? dragControl.currentLength : pendulumLength;
-
-                    // 计算目标位置并锁死Z轴
-                    Vector3 targetPos = transform.position + dirToMouse.normalized * currentLength;
-                    targetPos.z = transform.position.z; // 最终位置强制Z轴一致
-                    ball.transform.position = targetPos;
-                }
-            }
-        }
-
-        // 鼠标松开
-        if (Input.GetMouseButtonUp(0) && isDragging)
-        {
-            isDragging = false;
-            ball.isKinematic = false;
-            ball.velocity = Vector3.zero;
-            ball.angularVelocity = Vector3.zero;
-
-            //  拖动结束后，重新校准铰链轴心到悬挂点
-            if (hinge != null)
-            {
-                Vector3 correctAnchor = transform.position - ball.transform.position;
-                hinge.anchor = correctAnchor;
-            }
-
-            // 新增：激活周期计数
-            PendulumCounter counter = FindObjectOfType<PendulumCounter>();
-            if (counter != null)
-            {
-                counter.ActivateSwingCount();
-            }
-        }
+       
     }
 
     /// <summary>
@@ -149,5 +102,4 @@ public class Pendulum : MonoBehaviour
         Debug.Log($"   理论周期 T = {theoreticalPeriod:F2} s");
         Debug.Log($"   重力加速度 g = {calculatedG:F2} m/s²");
     }
-   
 }

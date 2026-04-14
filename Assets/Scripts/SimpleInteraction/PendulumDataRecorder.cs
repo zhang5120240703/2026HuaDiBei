@@ -28,7 +28,7 @@ public class PendulumDataRecorder : MonoBehaviour
     public Button btn_Save;
     public Button btn_Reset;
 
-    private struct ExperimentData
+   public struct ExperimentData
     {
         public float length;
         public float period;
@@ -39,6 +39,50 @@ public class PendulumDataRecorder : MonoBehaviour
     private ExperimentData[] experimentDatas = new ExperimentData[3];
     private const float PI = Mathf.PI;
 
+    #region ===================== 【AI 实验数据接口】 =====================
+    /// <summary>
+    /// 获取所有3组实验原始数据
+    /// 每组包含：摆长、周期、g、是否有效
+    /// </summary>
+    public ExperimentData[] GetAllExperimentData() => experimentDatas;
+
+    /// <summary>
+    /// 获取所有组计算出的重力加速度
+    /// 单位：m/s²
+    /// </summary>
+    public float[] GetAllGValues()
+    {
+        var list = new System.Collections.Generic.List<float>();
+        foreach (var item in experimentDatas) list.Add(item.gValue);
+        return list.ToArray();
+    }
+
+    /// <summary>
+    /// 获取最终平均重力加速度
+    /// 单位：m/s²
+    /// </summary>
+    public float GetFinalAverageG()
+    {
+        float total = 0;
+        int count = 0;
+        foreach (var d in experimentDatas)
+        {
+            if (d.isValid) { total += d.gValue; count++; }
+        }
+        return count > 0 ? total / count : 0;
+    }
+
+    /// <summary>
+    /// 判断所有实验数据是否完整有效
+    /// AI用于判断实验是否完成
+    /// </summary>
+    public bool IsAllExperimentsValid()
+    {
+        foreach (var d in experimentDatas)
+            if (!d.isValid) return false;
+        return true;
+    }
+    #endregion
     void Start()
     {
         ResetAllData();
