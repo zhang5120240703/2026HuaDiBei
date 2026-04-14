@@ -35,11 +35,11 @@ public class PendulumResetManager : MonoBehaviour
         // 1. 重置周期计数器（优先停止计数）
         ResetCounter();
 
-        // 2. 重置摆球位置+彻底停止运动（核心修复）
+        // 2. 重置摆球位置+彻底停止运动
         ResetPendulumBall();
 
         // 3. 校准铰链关节（只做一次，不重复刷新）
-        ResetHingeJoint();
+        ReconnectHingeAfterReset();
 
         Debug.Log("单摆实验重置完成：摆球回到最低点静止，摆长保持当前值，计数器已重置");
     }
@@ -54,58 +54,90 @@ public class PendulumResetManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 重置摆球位置+彻底停止所有运动（核心修复）
+    /// 重置摆球位置+彻底停止所有运动（断开铰链）
     /// </summary>
     private void ResetPendulumBall()
     {
         if (pendulumCore?.ball == null) return;
 
         Rigidbody ballRb = pendulumCore.ball;
+        HingeJoint hinge = pendulumCore.hinge;
 
-        // 第一步：强制开启运动学，彻底接管刚体
+        // 1. 临时断开铰链连接（避免关节施加约束力）
+        if (hinge != null)
+        {
+            hinge.connectedBody = null;
+            hinge.autoConfigureConnectedAnchor = true; // 临时自动配置，后续恢复
+        }
+
+        // 2. 强制开启运动学，彻底接管刚体
         ballRb.isKinematic = true;
 
-        // 第二步：清零所有运动状态（速度/角速度）
+        // 3. 清零所有运动状态
         ballRb.velocity = Vector3.zero;
         ballRb.angularVelocity = Vector3.zero;
 
-        // 第三步：计算最低点位置（使用当前摆长，不重置）
+        // 4. 计算最低点位置（使用当前摆长）
         float currentLength = dragControl != null ? dragControl.currentLength : pendulumCore.pendulumLength;
         Vector3 targetPos = pendulumCore.transform.position - Vector3.up * currentLength;
-        targetPos.z = pendulumCore.transform.position.z; // 锁定Z轴与悬挂点一致
-
-        // 第四步：强制设置位置到最低点
+        targetPos.z = pendulumCore.transform.position.z;
         ballRb.transform.position = targetPos;
 
-        
+        // 5. 同步变换旋转（确保无初始角偏差）
+        ballRb.transform.rotation = Quaternion.identity; // 或根据悬挂方向调整
 
-        // 第五步：延迟1帧关闭运动学（避免刚体立即受重力影响摆动）
+        // 6. 重新连接铰链（并正确配置锚点）
+        ReconnectHingeAfterReset();
+
+        // 7. 延迟释放运动学（确保铰链配置已应用）
         CancelInvoke();
-        Invoke(nameof(ReleaseKinematic), 0.01f);
+        Invoke(nameof(ReleaseKinematic), 0.02f);
     }
 
     /// <summary>
-    /// 延迟释放运动学状态（防止重置后立即摆动）
+    /// 重新连接铰链并校准锚点（在重置位置后调用）
+    /// </summary>
+    private void ReconnectHingeAfterReset()
+    {
+        if (pendulumCore?.hinge == null || pendulumCore?.ball == null) return;
+
+        HingeJoint hinge = pendulumCore.hinge;
+        Rigidbody fixedRb = pendulumCore.GetComponent<Rigidbody>();
+        if (fixedRb == null)
+        {
+            fixedRb = pendulumCore.gameObject.AddComponent<Rigidbody>();
+            fixedRb.isKinematic = true;
+            fixedRb.useGravity = false;
+        }
+
+        // 重新设置连接体
+        hinge.connectedBody = fixedRb;
+        hinge.axis = new Vector3(0, 0, 1);
+        hinge.useMotor = false;
+        hinge.enableCollision = false;
+
+        // 关键：手动计算锚点（悬挂点在摆球局部空间的位置）
+        Vector3 anchorPoint = pendulumCore.transform.position - pendulumCore.ball.transform.position;
+        hinge.anchor = anchorPoint;
+        hinge.connectedAnchor = Vector3.zero;
+        hinge.autoConfigureConnectedAnchor = false;
+
+        // 确保铰链角度复位为0
+        
+    }
+
+    /// <summary>
+    /// 延迟释放运动学（可改为协程等待固定更新）
     /// </summary>
     private void ReleaseKinematic()
     {
         if (pendulumCore?.ball == null) return;
         pendulumCore.ball.isKinematic = false;
+        // 再次强制清零速度，防止物理引擎在激活瞬间添加意外速度
+        pendulumCore.ball.velocity = Vector3.zero;
+        pendulumCore.ball.angularVelocity = Vector3.zero;
     }
-
-    /// <summary>
-    /// 重置铰链关节（适配最低点位置）
-    /// </summary>
-    private void ResetHingeJoint()
-    {
-        if (pendulumCore?.ball == null || pendulumCore.hinge == null) return;
-
-        // 校准铰链锚点到最低点
-        Vector3 correctAnchor = pendulumCore.transform.position - pendulumCore.ball.transform.position;
-        pendulumCore.hinge.anchor = correctAnchor;
-        pendulumCore.hinge.connectedAnchor = Vector3.zero;
-    }
-
+    
     /// <summary>
     /// 编辑器快速重置
     /// </summary>
@@ -120,4 +152,5 @@ public class PendulumResetManager : MonoBehaviour
     {
         CancelInvoke(nameof(ReleaseKinematic));
     }
+    
 }
