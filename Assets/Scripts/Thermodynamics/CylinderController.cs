@@ -292,7 +292,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             IdealGasSimulation.ProcessType.Isothermal => true, // 等温过程允许拖动
             IdealGasSimulation.ProcessType.Isobaric => true, // 等压过程允许拖动
             IdealGasSimulation.ProcessType.Isochoric => false, // 等容过程不允许拖动
-            _ => true
+            _ => false
         };
 
     }
