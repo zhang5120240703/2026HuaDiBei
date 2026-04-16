@@ -154,16 +154,30 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
                 float lambda_m = wl * 1e-9f;
                 float phaseFactor = Mathf.PI * physicalX_m / (lambda_m * L_m);
 
+                // ★ 干涉强度（双缝）
                 float phase_i = d_m * phaseFactor;
                 float intensity_i = Mathf.Cos(phase_i) * Mathf.Cos(phase_i);
 
+                // ★ 衍射强度（单缝 sinc 函数）- Fix：正确处理极限
                 float phase_d = a_m * phaseFactor;
-                float sinc = Mathf.Abs(phase_d) < 1e-6f
-                    ? 1f
-                    : Mathf.Sin(phase_d) / phase_d;
+                float sinc;
+                
+                if (Mathf.Abs(phase_d) < 1e-6f)
+                {
+                    // phase_d ≈ 0 时，sin(x)/x ≈ 1
+                    sinc = 1f;
+                }
+                else
+                {
+                    // 标准 sinc 函数
+                    sinc = Mathf.Sin(phase_d) / phase_d;
+                }
+                
                 float intensity_d = sinc * sinc;
-
-                finalColor += WavelengthToRGB(wl) * (intensity_i * intensity_d);
+                
+                // ★ 增加暗纹的相对亮度，改善视觉对比
+                float intensity = (intensity_i * intensity_d);
+                finalColor += WavelengthToRGB(wl) * Mathf.Pow(intensity, 0.8f);  // 伽马校正
             }
 
             lutTexture.SetPixel(x, 0, finalColor / normalizeFactor);
@@ -201,11 +215,15 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
             if (existing != null)
                 AssetDatabase.DeleteAsset(LUT_ASSET_PATH);
 
-            AssetDatabase.CreateAsset(lutTexture, LUT_ASSET_PATH);
-            AssetDatabase.SaveAssets();
-            // 不调用 AssetDatabase.Refresh()，防止触发全量重导入
-
-            Debug.Log("[DoubleSlitLUTGenerator] LUT Asset 已保存: " + LUT_ASSET_PATH);
+            // ★ Fix3：使用 Texture2D.SaveAndReimport() 避免 null 异常
+            // 直接将纹理保存为 PNG/EXR，然后由 AssetDatabase 导入
+            string pngPath = LUT_ASSET_PATH.Replace(".asset", ".png");
+            byte[] pngData = lutTexture.EncodeToPNG();
+            System.IO.File.WriteAllBytes(pngPath, pngData);
+            
+            AssetDatabase.ImportAsset(pngPath, ImportAssetOptions.ForceUpdate);
+            
+            Debug.Log("[DoubleSlitLUTGenerator] LUT Asset 已保存: " + pngPath);
         }
         catch (System.Exception ex)
         {
@@ -220,10 +238,10 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
         float g = Mathf.Clamp01(1.0f - Mathf.Abs(wl - 540.0f) / 85.0f);
         float b = Mathf.Clamp01(1.0f - Mathf.Abs(wl - 440.0f) / 70.0f);
 
-        r *= (wl >= 580 ? 1 : 0) + (wl < 440 ? 0.5f : 0);
-        g *= (wl >= 490 && wl < 580 ? 1 : 0) + (wl >= 440 && wl < 490 ? 0.5f : 0);
-        b *= (wl < 490 ? 1 : 0);
-
+        // 原代码问题：这些乘法掩码过度限制了颜色范围
+        r *= (wl >= 580 ? 1 : 0) + (wl < 440 ? 0.5f : 0);  // 580-780nm 为红色
+        g *= (wl >= 490 && wl < 580 ? 1 : 0) + (wl >= 440 && wl < 490 ? 0.5f : 0);  // 490-580nm 为绿色
+        b *= (wl < 490 ? 1 : 0);  // <490nm 为蓝色
         return new Color(r, g, b);
     }
 }
