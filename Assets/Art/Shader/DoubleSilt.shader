@@ -2,9 +2,13 @@ Shader "Custom/DoubleSlitInterference_LUT"
 {
     Properties
     {
+        // 干涉查找表纹理：存储双缝干涉计算结果，必须关联脚本生成的LUT纹理
         _LUT ("Interference LUT", 2D) = "white" {}
+        // 视觉缩放：控制干涉条纹显示大小，数值越大条纹越宽、间距越大
         _VisualScale ("Visual Scale", Range(0.1, 50.0)) = 5.0
+         // 宽高比：匹配显示物体的宽/高比例，防止条纹拉伸变形
         _Aspect ("Aspect Ratio (Width/Height)", Range(0.1, 4.0)) = 1.78
+         // 最大物理范围：单位mm，必须与C#脚本中的maxRange保持一致，决定条纹物理范围
         _MaxRange ("Max Physical Range", Float) = 50.0 // 必须与C#脚本中的 maxRange 保持一致
     }
     SubShader
