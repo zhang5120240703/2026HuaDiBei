@@ -20,7 +20,6 @@ public class UIManager : MonoBehaviour
 
     }
 
-    
 
     private void OnStateChanged(float pressure, float volume, float temperature)
     {
@@ -43,10 +42,7 @@ public class UIManager : MonoBehaviour
         {
             uiPanel.ShowError("体积超出允许范围 (0.5L-2.0L)");
         }
-        else
-        {
-            uiPanel.HideError();
-        }
+
     }
     
     private void OnDataCollected()
@@ -82,7 +78,7 @@ public class UIManager : MonoBehaviour
     // 切换实验过程
     public void SetProcess(IdealGasSimulation.ProcessType process)
     {
-        gasSimulation.SetProcess(process);
+        uiPanel.SetProcess(process);
         ResetUI();
     }
 

@@ -8,8 +8,10 @@ using static UnityEngine.GraphicsBuffer;
 public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
     public Transform piston; // 活塞的Transform组件
+    public IdealGasSimulation gasSimulation; // 引用理想气体模拟器，监听温度变化等参数
+
     public float cylinderHeight = 2.0f; // 气缸高度（对应2.0L体积）
-    public float minHeight = 0.0f; // 最小高度（对应0.0L体积）
+    public float minHeight = 0.2f; // 最小高度（对应0.0L体积）
     public float maxHeight = 2.0f; // 最大高度（对应2.0L体积）
     
     private float initialY; // 初始鼠标Y位置
@@ -30,7 +32,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     private const float maxStepFractionPerFrame = 0.25f; // 每帧允许移动的最大比例（相对于 cylinderHeight）
 
     // 防止体积为0导致除零和允许的最小体积（可根据需求调整）
-    private const float minVolumeEpsilon = 1e-3f;
+    public const float minVolumeEpsilon = 1e-3f;
 
     // 事件
     public System.Action<float> OnVolumeChanged;
@@ -42,8 +44,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     private float targetPistonY;// 目标活塞位置
     private float smoothVelocity; // 平滑移动的速度
     public float smoothTime = 0.1f; // 平滑移动的时间常数
-    //气体监听
-    public IdealGasSimulation gasSimulation; // 引用理想气体模拟器，监听温度变化等参数
+
 
 
     private IdealGasSimulation.ProcessType currentProcess;
@@ -101,14 +102,12 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         //如果为等容过程，不允许拖动
         if (!canDrag)
             return;
-        //smoothVelocity = 0f;
+
         if (!pointerDown)
             return;
 
         // 累计绝对位移用于阈值判断（避免点按触发）
         accumulatedDrag += Mathf.Abs(eventData.delta.y);
-
-        
 
         if (!isDragging)
         {
@@ -128,38 +127,27 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         float maxStep = cylinderHeight * maxStepFractionPerFrame;
         pistonDeltaY = Mathf.Clamp(pistonDeltaY, -maxStep, maxStep);
 
-        // 采用相对于当前活塞位置的增量（而不是 initialPistonY + totalDelta）
+        // 采用相对于当前活塞位置的增量
         float tentativePistonY = piston.localPosition.y + pistonDeltaY;
 
         // 限制活塞位置在气缸范围内（先基础范围）
         float minPistonY = -cylinderHeight / 2;
         float maxPistonY = cylinderHeight / 2;
 
-        bool isOutOfRange = false;
         if (tentativePistonY < minPistonY)
         {
             tentativePistonY = minPistonY;
-            isOutOfRange = true;
         }
         else if (tentativePistonY > maxPistonY)
         {
             tentativePistonY = maxPistonY;
-            isOutOfRange = true;
         }
 
         // 计算变动前后的体积与当前/预测压强
         float currentVolume = GetCurrentVolume();
         float newVolume = VolumeFromPistonY(tentativePistonY);
 
-        // 强制新体积不小于 allowedMinVolume，避免体积为0
-        float allowedMinVolume = Mathf.Max(minHeight + minVolumeEpsilon, minVolumeEpsilon);
-        if (newVolume < allowedMinVolume)
-        {
-            // 将活塞位置限制到对应 allowedMinVolume 的位置（不允许进一步压缩到 0）
-            tentativePistonY = PistonYFromVolume(allowedMinVolume);
-            newVolume = allowedMinVolume;
-            isOutOfRange = true;
-        }
+
 
         // 预测压强（根据预测体积）
         float predictedPressure = PredictPressureForVolume(newVolume);
@@ -173,15 +161,12 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             return;
         }
 
-        // 应用移动
-        //piston.localPosition = new Vector3(piston.localPosition.x, tentativePistonY, piston.localPosition.z);
         // 改为设置目标位置（不要直接瞬移）
         targetPistonY = tentativePistonY;
 
         // 计算当前体积并通知
         float appliedVolume = GetCurrentVolume();
         OnVolumeChanged?.Invoke(appliedVolume);
-        OnVolumeRangeExceeded?.Invoke(isOutOfRange);
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -193,7 +178,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
 
     #endregion
 
-    //平滑移动活塞（在Update中调用）
+
+    #region 平滑移动活塞
     private void SmoothChangePiston()
     {
         float newY = Mathf.SmoothDamp(
@@ -209,15 +195,18 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             piston.localPosition.z
         );
     }
-
+    #endregion
 
     private void OnGasStateChanged(float pressure, float volume, float temperature)
     {
         // 正在拖拽时，不要覆盖玩家操作
         if (isDragging) return;
 
+
         // 根据体积计算目标位置
         targetPistonY = PistonYFromVolume(volume);
+
+
     }
 
 
@@ -231,6 +220,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
 
         return Mathf.Clamp(volume, minHeight + minVolumeEpsilon, maxHeight); // 保证体积在有效范围内，避免为0
     }
+
 
     // 根据指定的活塞Y位置计算体积（不修改实际位置）
     private float VolumeFromPistonY(float pistonY)
@@ -292,10 +282,12 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
             IdealGasSimulation.ProcessType.Isothermal => true, // 等温过程允许拖动
             IdealGasSimulation.ProcessType.Isobaric => true, // 等压过程允许拖动
             IdealGasSimulation.ProcessType.Isochoric => false, // 等容过程不允许拖动
+            IdealGasSimulation.ProcessType.Null => false, // 未选择状态不允许拖动
             _ => false
         };
 
     }
+    
 
 
     // 获取当前体积变化率
@@ -319,5 +311,10 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     public float GetMaxVolume()
     {
         return maxHeight;
+    }
+
+    public bool GetPistonDragged()
+    {
+        return canDrag;
     }
 }

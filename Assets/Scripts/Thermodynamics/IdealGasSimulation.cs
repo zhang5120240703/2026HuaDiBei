@@ -20,16 +20,17 @@ public class IdealGasSimulation : MonoBehaviour
     {
         Isothermal=0, // 等温过程0
         Isobaric=1, // 等压过程1
-        Isochoric=2 // 等容过程2
+        Isochoric=2, // 等容过程2
+        Null=3//未选择3
     }
     
-    public ProcessType currentProcess = ProcessType.Isothermal;
+    public ProcessType currentProcess = ProcessType.Null;
     
     // 固定值（根据当前过程）
     private float fixedValue;
     
     // 体积范围限制
-    private const float minVolume = 0.0f;
+    private const float minVolume = 0.2f;
     private const float maxVolume = 1.8f;
     
     // 温度范围限制
@@ -59,14 +60,18 @@ public class IdealGasSimulation : MonoBehaviour
     }
     private void Start()
     {
+        Initialization();
+    }
+    
+    public void Initialization()
+    {
         // 初始设置
         volume = 1.0f;
         temperature = 300.0f;
         UpdatePressure();
-        SetProcess(ProcessType.Isothermal);
-
+        SetProcess(ProcessType.Null);
     }
-    
+
     public void SetProcess(ProcessType process)
     {
         currentProcess = process;
@@ -82,6 +87,9 @@ public class IdealGasSimulation : MonoBehaviour
                 break;
             case ProcessType.Isochoric:// 等容过程：体积固定
                 fixedValue = volume;
+                break;
+            case ProcessType.Null:// 未选择
+                fixedValue = 0;
                 break;
         }
     }

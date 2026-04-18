@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections;
+using System.Diagnostics;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,7 +8,6 @@ public class UIPanel : MonoBehaviour
 {
     // 引用
     public CylinderController cylinderController;
-    public IdealGasSimulation gasSimulation;
     public DataCollector dataCollector;
     
     // 参数文本
@@ -24,10 +24,11 @@ public class UIPanel : MonoBehaviour
     public Button isothermalButton;
     public Button isobaricButton;
     public Button isochoricButton;
+
     //控制按钮
     public Button startButton;
     public Button resetButton;
-    public Button backButton;
+    public Button confirmButton;
 
 
     public TMP_Text processText;
@@ -35,7 +36,6 @@ public class UIPanel : MonoBehaviour
     public TMP_Text progressText;
     public TMP_Text errorText;
     // 实验状态
-    private string currentStatus = "准备就绪";
     private int currentStep = 1;
     private const int totalSteps = 5;
 
@@ -46,14 +46,9 @@ public class UIPanel : MonoBehaviour
     private void Start()
     {
         // 初始化事件监听
-        gasSimulation.OnStateChanged += UpdateStatusDisplay;
+        IdealGasSimulation.Instance.OnStateChanged += UpdateStatusDisplay;
         dataCollector.OnDataCollected += UpdateDataDisplay;
         dataCollector.OnAnalysisCompleted += UpdateAnalysisDisplay;
-
-        // 初始化按钮事件
-        //isothermalButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isothermal));
-        //isobaricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isobaric));
-        //isochoricButton.onClick.AddListener(() => SetProcess(IdealGasSimulation.ProcessType.Isochoric));
 
         // 温度输入事件
         temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
@@ -72,16 +67,18 @@ public class UIPanel : MonoBehaviour
         inputPanel.alpha = 0;
 
         // 初始更新
-        UpdateStatusDisplay(gasSimulation.GetPressure(), gasSimulation.GetVolume(), gasSimulation.GetTemperature());
-        UpdateProcessText();
+        UpdateStatusDisplay(IdealGasSimulation.Instance.GetPressure(), IdealGasSimulation.Instance.GetVolume(), IdealGasSimulation.Instance.GetTemperature());
         UpdateStatusText();
         UpdateProgressText();
         HideError();
-        SetTemperatureSliderEnable(IdealGasSimulation.Instance.GetCurrentProcess());
-        SetPressureSliderEnable(IdealGasSimulation.Instance.GetCurrentProcess());
-        SetVolumeSliderEnable(IdealGasSimulation.Instance.GetCurrentProcess());
+        SetTemperatureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
+        SetPressureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
+        SetVolumeSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
     }
-    
+
+
+
+    //更新状态显示
     public void UpdateStatusDisplay(float pressure, float volume, float temperature)
     {
         // 更新数据显示
@@ -90,17 +87,23 @@ public class UIPanel : MonoBehaviour
         temperatureText.text = "温度: " + temperature.ToString("F2") + " K";
         pvProductText.text = "PV乘积: " + (pressure * volume).ToString("F2") + " kPa·L";
 
+        //使用 SetValueWithoutNotify 避免触发 onValueChanged 回调
+        // 这样不会在同步 UI 时意外修改模拟状态
+        temperatureSlider.SetValueWithoutNotify(temperature);
+        pressureSlider.SetValueWithoutNotify(pressure);
+        volumeSlider.SetValueWithoutNotify(volume);
+
         // 更新Slider的值
         temperatureSlider.value = temperature; // 同步Slider值
         pressureSlider.value = pressure;
         volumeSlider.value = volume;
     }
 
-    // Slider改变时调用
+    #region Slider改变时调用
     public void OnTemperatureSliderChanged(float value)
     {
         // 使用Slider值来设置温度
-        gasSimulation.SetTemperature(value);
+        IdealGasSimulation.Instance.SetTemperature(value);
 
         // 更新温度显示
         temperatureText.text = "温度: " + value.ToString("F2") + " K";
@@ -108,7 +111,7 @@ public class UIPanel : MonoBehaviour
     public void OnPressureSliderChanged(float value)
     {
         // 使用Slider值来设置压强
-        gasSimulation.SetPressure(value);
+        IdealGasSimulation.Instance.SetPressure(value);
 
         // 更新压强显示
         pressureText.text = "压强: " + value.ToString("F2") + " kPa";
@@ -117,52 +120,55 @@ public class UIPanel : MonoBehaviour
     public void OnVolumeSliderChanged(float value)
     {
         // 使用Slider值来设置体积
-        gasSimulation.SetVolume(value);
-
+        IdealGasSimulation.Instance.SetVolume(value);
         // 更新体积显示
         volumeText.text = "体积: " + value.ToString("F2") + " L";
     }
+    #endregion
 
+
+
+    #region 滑动条显示控制
     //等温状态不显示TemperatureSlider
-    private void SetTemperatureSliderEnable(IdealGasSimulation.ProcessType process)
+    private void SetTemperatureSliderDisplay(IdealGasSimulation.ProcessType process)
     {
         bool isActive = process == IdealGasSimulation.ProcessType.Isothermal ? false : true;
 
         temperatureSlider.gameObject.SetActive(isActive);//显示或隐藏温度输入滑动条
     }
     //等压状态不显示PressureSlider
-    private void SetPressureSliderEnable(IdealGasSimulation.ProcessType process)
+    private void SetPressureSliderDisplay(IdealGasSimulation.ProcessType process)
     {
         bool isActive = process == IdealGasSimulation.ProcessType.Isobaric ? false : true;
 
         pressureSlider.gameObject.SetActive(isActive);//显示或隐藏压强输入滑动条
     }
     //等容状态不显示VolumeSlider
-    private void SetVolumeSliderEnable(IdealGasSimulation.ProcessType process)
+    private void SetVolumeSliderDisplay(IdealGasSimulation.ProcessType process)
     {
         bool isActive = process == IdealGasSimulation.ProcessType.Isochoric ? false : true;
         volumeSlider.gameObject.SetActive(isActive);
     }
+    #endregion
 
 
-    public void SetProcess(int process)
+
+
+
+    public void SetProcess(IdealGasSimulation.ProcessType process)
     {
-        gasSimulation.SetProcess((IdealGasSimulation.ProcessType)process);
-        cylinderController.SetCurrentProcess((IdealGasSimulation.ProcessType)process);
-        SetTemperatureSliderEnable((IdealGasSimulation.ProcessType)process);
-        SetPressureSliderEnable((IdealGasSimulation.ProcessType)process);
-        SetVolumeSliderEnable((IdealGasSimulation.ProcessType)process);
+        SetTemperatureSliderDisplay(process);
+        SetPressureSliderDisplay(process);
+        SetVolumeSliderDisplay(process);
         UpdateProcessText();
-        ResetExperiment();
-
     }
-    
 
 
 
+    #region 更新文本
     private void UpdateProcessText()
     {
-        switch (gasSimulation.currentProcess)
+        switch (IdealGasSimulation.Instance.currentProcess)
         {
             case IdealGasSimulation.ProcessType.Isothermal:
                 processText.text = "当前过程: 等温过程 (玻意耳定律)";
@@ -173,6 +179,9 @@ public class UIPanel : MonoBehaviour
             case IdealGasSimulation.ProcessType.Isochoric:
                 processText.text = "当前过程: 等容过程 (查理定律)";
                 break;
+            case IdealGasSimulation.ProcessType.Null:
+                processText.text = "当前过程: 未选择";
+                break;
         }
     }
     
@@ -181,7 +190,7 @@ public class UIPanel : MonoBehaviour
         switch (currentStep)
         {
             case 1:
-                statusText.text = "操作指引: 选择实验过程并设置温度";
+                statusText.text = "操作指引: 选择实验过程";
                 break;
             case 2:
                 statusText.text = "操作指引: 点击开始按钮开始实验";
@@ -197,7 +206,8 @@ public class UIPanel : MonoBehaviour
                 break;
         }
     }
-    
+    #endregion
+
     private void UpdateProgressText()
     {
         progressText.text = "实验进度: " + currentStep + "/" + totalSteps;
@@ -224,7 +234,7 @@ public class UIPanel : MonoBehaviour
         bool verified = false;
         string lawName = "";
         
-        switch (gasSimulation.currentProcess)
+        switch (IdealGasSimulation.Instance.currentProcess)
         {
             case IdealGasSimulation.ProcessType.Isothermal:
                 verified = dataCollector.IsBoyleLawVerified();
@@ -253,18 +263,22 @@ public class UIPanel : MonoBehaviour
         currentStep = 5;
         UpdateProgressText();
     }
-    
+
+    #region 错误信息的显示控制
     public void ShowError(string message)
     {
-        errorText.text = "错误: " + message;
+        UnityEngine.Debug.Log("ShowError 被调用");
         errorText.gameObject.SetActive(true);
+        errorText.text = "错误: " + message;
     }
     
     public void HideError()
     {
         errorText.gameObject.SetActive(false);
     }
-    
+    #endregion
+
+    #region 控制使用开始和重置
     public void StartExperiment()
     {
         currentStep = 3;
@@ -273,7 +287,6 @@ public class UIPanel : MonoBehaviour
         UpdateStatusText();
         UpdateProgressText();
         dataCollector.ResetData();
-        HideError();
     }
     
     public void ResetExperiment()
@@ -285,13 +298,9 @@ public class UIPanel : MonoBehaviour
         UpdateProgressText();
         HideError();
     }
-    
-    public void BackToMainMenu()
-    {
-        // 这里可以实现返回主菜单的逻辑
-        // 例如加载主场景
-        UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
-    }
+    #endregion
+
+
     
     public void SetStep(int step)
     {
