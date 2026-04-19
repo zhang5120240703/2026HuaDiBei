@@ -24,7 +24,7 @@ public class IdealGasSimulation : MonoBehaviour
         Null=3//未选择3
     }
     
-    public ProcessType currentProcess = ProcessType.Null;
+    private ProcessType currentProcess = ProcessType.Null;
     
     // 固定值（根据当前过程）
     private float fixedValue;
@@ -204,8 +204,9 @@ public class IdealGasSimulation : MonoBehaviour
     {
         OnStateChanged?.Invoke(pressure, volume, temperature);
     }
-    
-    // 获取当前状态值
+
+
+    #region 获取当前状态值(接口)
     public float GetPressure() { return pressure; }
     public float GetVolume() { return volume; }
     public float GetTemperature() { return temperature; }
@@ -217,6 +218,8 @@ public class IdealGasSimulation : MonoBehaviour
     public float GetMinPressure() { return minPressure; }
     public float GetMaxPressure() { return maxPressure; }
     public ProcessType GetCurrentProcess() { return currentProcess; }
+
+    #endregion
 
     // 计算理论值（用于误差分析）
     public float CalculateTheoreticalPressure(float targetVolume, float targetTemperature)

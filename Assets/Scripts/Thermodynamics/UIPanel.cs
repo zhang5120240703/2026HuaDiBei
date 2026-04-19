@@ -50,27 +50,25 @@ public class UIPanel : MonoBehaviour
         dataCollector.OnDataCollected += UpdateDataDisplay;
         dataCollector.OnAnalysisCompleted += UpdateAnalysisDisplay;
 
-        // 温度输入事件
+        //滑动条输入事件监听
         temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
-
-        //压强输入事件
         pressureSlider.onValueChanged.AddListener(OnPressureSliderChanged);
-
-        //体积输入事件
         volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
-
         
         //初始隐藏参数面板
         statusPanel.alpha = 0;
-
         //初始隐藏输入面板
         inputPanel.alpha = 0;
+
+
 
         // 初始更新
         UpdateStatusDisplay(IdealGasSimulation.Instance.GetPressure(), IdealGasSimulation.Instance.GetVolume(), IdealGasSimulation.Instance.GetTemperature());
         UpdateStatusText();
         UpdateProgressText();
+        UpdateProcessText(IdealGasSimulation.Instance.GetCurrentProcess());
         HideError();
+        // 根据初始过程类型设置滑动条显示
         SetTemperatureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
         SetPressureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
         SetVolumeSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
@@ -82,10 +80,10 @@ public class UIPanel : MonoBehaviour
     public void UpdateStatusDisplay(float pressure, float volume, float temperature)
     {
         // 更新数据显示
-        pressureText.text = "压力: " + pressure.ToString("F2") + " kPa";
-        volumeText.text = "体积: " + volume.ToString("F2") + " L";
-        temperatureText.text = "温度: " + temperature.ToString("F2") + " K";
-        pvProductText.text = "PV乘积: " + (pressure * volume).ToString("F2") + " kPa·L";
+        pressureText.text = "压力: " + pressure.ToString("F3") + " kPa";
+        volumeText.text = "体积: " + volume.ToString("F3") + " L";
+        temperatureText.text = "温度: " + temperature.ToString("F3") + " K";
+        pvProductText.text = "PV乘积: " + (pressure * volume).ToString("F3") + " kPa·L";
 
         //使用 SetValueWithoutNotify 避免触发 onValueChanged 回调
         // 这样不会在同步 UI 时意外修改模拟状态
@@ -106,7 +104,7 @@ public class UIPanel : MonoBehaviour
         IdealGasSimulation.Instance.SetTemperature(value);
 
         // 更新温度显示
-        temperatureText.text = "温度: " + value.ToString("F2") + " K";
+        //temperatureText.text = "温度: " + value.ToString("F2") + " K";
     }
     public void OnPressureSliderChanged(float value)
     {
@@ -114,7 +112,7 @@ public class UIPanel : MonoBehaviour
         IdealGasSimulation.Instance.SetPressure(value);
 
         // 更新压强显示
-        pressureText.text = "压强: " + value.ToString("F2") + " kPa";
+        //pressureText.text = "压强: " + value.ToString("F2") + " kPa";
     }
 
     public void OnVolumeSliderChanged(float value)
@@ -122,7 +120,7 @@ public class UIPanel : MonoBehaviour
         // 使用Slider值来设置体积
         IdealGasSimulation.Instance.SetVolume(value);
         // 更新体积显示
-        volumeText.text = "体积: " + value.ToString("F2") + " L";
+        //volumeText.text = "体积: " + value.ToString("F2") + " L";
     }
     #endregion
 
@@ -160,15 +158,15 @@ public class UIPanel : MonoBehaviour
         SetTemperatureSliderDisplay(process);
         SetPressureSliderDisplay(process);
         SetVolumeSliderDisplay(process);
-        UpdateProcessText();
+        UpdateProcessText(process);
     }
 
 
 
     #region 更新文本
-    private void UpdateProcessText()
+    private void UpdateProcessText(IdealGasSimulation.ProcessType process)
     {
-        switch (IdealGasSimulation.Instance.currentProcess)
+        switch (process)
         {
             case IdealGasSimulation.ProcessType.Isothermal:
                 processText.text = "当前过程: 等温过程 (玻意耳定律)";
@@ -196,7 +194,7 @@ public class UIPanel : MonoBehaviour
                 statusText.text = "操作指引: 点击开始按钮开始实验";
                 break;
             case 3:
-                statusText.text = "操作指引: 移动活塞改变体积，采集数据";
+                statusText.text = "操作指引: 移动活塞或者调整滑动条，点击确认按钮采集数据";
                 break;
             case 4:
                 statusText.text = "操作指引: 查看数据分析结果";
@@ -234,7 +232,7 @@ public class UIPanel : MonoBehaviour
         bool verified = false;
         string lawName = "";
         
-        switch (IdealGasSimulation.Instance.currentProcess)
+        switch (IdealGasSimulation.Instance.GetCurrentProcess())
         {
             case IdealGasSimulation.ProcessType.Isothermal:
                 verified = dataCollector.IsBoyleLawVerified();
@@ -296,6 +294,7 @@ public class UIPanel : MonoBehaviour
         dataCollector.ResetData();
         UpdateStatusText();
         UpdateProgressText();
+        UpdateProcessText(IdealGasSimulation.Instance.GetCurrentProcess());
         HideError();
     }
     #endregion

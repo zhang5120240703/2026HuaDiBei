@@ -22,7 +22,9 @@ public class ExperimentStepController : MonoBehaviour
         DataAnalysis, // 数据分析 
         Conclusion // 结论总结
     }
-    
+    // 手动确认计数（数据采集时用户需要确认三次）
+    private const int requiredConfirms = 3;
+    private int confirmCount = 0;
 
     private ExperimentStage currentStage = ExperimentStage.Preparation;// 当前实验阶段
     
@@ -102,10 +104,8 @@ public class ExperimentStepController : MonoBehaviour
             case ExperimentStage.DataAnalysis:
                 // 数据分析阶段：检查是否完成了分析
                 // 当数据采集完成时自动进入结论总结阶段
-                if (dataCollector.GetDataPointCount() >= 3)
-                {
-                    SetStage(ExperimentStage.Conclusion);
-                }
+                
+
                 break;
                 
             case ExperimentStage.Conclusion:
@@ -132,27 +132,48 @@ public class ExperimentStepController : MonoBehaviour
     public void ResetExperiment()
     {
         SetStage(ExperimentStage.Preparation);
-        uiManager.ResetUI();
         IdealGasSimulation.Instance.Initialization();
+        StopDataCollectionMode();
+        dataCollector.ResetData();
+        uiManager.ResetUI();
         isReset = true;
         isStart = false;
         isSelectExp = false;
     }
-    
 
+    // 确认参数(按钮调用)
     public void ConfirmParameter()
     {
+        if (currentStage != ExperimentStage.DataCollection)
+        {
+            uiPanel.ShowError("当前不在数据采集阶段，无法确认参数。");
+            return;
+        }
 
+        dataCollector.CollectDataPoint();
+        confirmCount++;
+        // 更新 UI 提示
+        if (uiPanel != null && uiPanel.statusText != null)
+            uiPanel.statusText.text = $"已确认 {confirmCount}/{requiredConfirms} 次参数。";
+
+        // 当达到所需确认次数时，停止手动模式并进入下一阶段（数据分析）
+        if (confirmCount >= requiredConfirms)
+        {
+            // 停止手动采集
+            StopDataCollectionMode();
+
+        }
     }
     // 切换实验过程
     public void SetProcess(int process)
     {
-        uiManager.SetProcess((IdealGasSimulation.ProcessType)process);
         IdealGasSimulation.Instance.SetProcess((IdealGasSimulation.ProcessType)process);
         cylinderController.SetCurrentProcess((IdealGasSimulation.ProcessType)process);
-        isSelectExp = true;
+        uiManager.SetProcess((IdealGasSimulation.ProcessType)process);
+        isSelectExp = true; 
     }
     
+
     // 获取当前阶段
     public ExperimentStage GetCurrentStage()
     {
@@ -172,7 +193,20 @@ public class ExperimentStepController : MonoBehaviour
                 return true;
         }
     }
-    
+
+    // 停止数据采集模式
+    private void StopDataCollectionMode()
+    {
+        // 禁用确认按钮
+        if (uiPanel != null && uiPanel.confirmButton != null)
+            uiPanel.confirmButton.interactable = false;
+
+        // 重置计数与提示
+        confirmCount = 0;
+        if (uiPanel != null && uiPanel.statusText != null)
+            uiPanel.statusText.text = "数据采集已停止";
+    }
+
     // 获取当前阶段的操作指引
     //public string GetStageInstruction()
     //{  

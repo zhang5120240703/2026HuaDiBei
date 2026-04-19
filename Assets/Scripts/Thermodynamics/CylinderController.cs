@@ -8,7 +8,6 @@ using static UnityEngine.GraphicsBuffer;
 public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
     public Transform piston; // 活塞的Transform组件
-    public IdealGasSimulation gasSimulation; // 引用理想气体模拟器，监听温度变化等参数
 
     public float cylinderHeight = 2.0f; // 气缸高度（对应2.0L体积）
     public float minHeight = 0.2f; // 最小高度（对应0.0L体积）
@@ -17,7 +16,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     private float initialY; // 初始鼠标Y位置
     private float initialPistonY; // 初始活塞Y位置
     private bool isDragging = false;
-    private bool canDrag = true; // 是否允许拖动（根据过程类型限制）
+    private bool canDrag = false; // 是否允许拖动（根据过程类型限制）
     private float lastVolume; // 上一次记录的体积
     private float volumeChangeRate; // 体积变化率
     private float lastChangeTime; // 上一次变化时间
@@ -54,9 +53,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     private void Start()
     {
         currentProcess = IdealGasSimulation.Instance.GetCurrentProcess();
-        gasSimulation =IdealGasSimulation.Instance;
         //监听气体变化
-        gasSimulation.OnStateChanged += OnGasStateChanged;
+        IdealGasSimulation.Instance.OnStateChanged += OnGasStateChanged;
         //初始化目标位置为当前活塞位置
         targetPistonY = piston.localPosition.y;
 
@@ -287,9 +285,10 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         };
 
     }
-    
 
 
+
+    #region 数据接口
     // 获取当前体积变化率
     public float GetVolumeChangeRate()
     {
@@ -317,4 +316,5 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     {
         return canDrag;
     }
+    #endregion
 }

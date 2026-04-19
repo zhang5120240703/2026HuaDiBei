@@ -1,10 +1,9 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 public class DataCollector : MonoBehaviour
 {
     // 引用
-    public IdealGasSimulation gasSimulation;
     public CylinderController cylinderController;
     
     // 数据点结构
@@ -40,32 +39,45 @@ public class DataCollector : MonoBehaviour
     private void Update()
     {
         // 检查数据稳定状态
-        if (cylinderController.IsVolumeStable() && Time.time - lastVolumeChangeTime > stabilizationTime && dataPoints.Count < 5)
-        {
-            CollectDataPoint();
-        }
+        //if (cylinderController.IsVolumeStable() &&
+        //    Time.time - lastVolumeChangeTime > stabilizationTime &&
+        //    dataPoints.Count < 5)
+        //{
+        //    CollectDataPoint();
+        //}
+
+
     }
     
     public void OnVolumeChanged(float newVolume)
     {
         lastVolumeChangeTime = Time.time;
     }
-    
-    private void CollectDataPoint()
+
+
+    // 创建数据点
+    private DataPoint CreatDataPoint()
     {
-        float pressure = gasSimulation.GetPressure();
-        float volume = gasSimulation.GetVolume();
-        float temperature = gasSimulation.GetTemperature();
-        
-        // 创建数据点
+        float pressure = IdealGasSimulation.Instance.GetPressure();
+        float volume = IdealGasSimulation.Instance.GetVolume();
+        float temperature = IdealGasSimulation.Instance.GetTemperature();
+
         DataPoint point = new DataPoint
         {
             volume = volume,
             pressure = pressure,
             temperature = temperature,
             pvProduct = pressure * volume,
-            inverseVolume = 1.0f / volume
+            inverseVolume = 1.0f / Mathf.Max(volume, 1e-6f)
         };
+
+        return point;
+    }
+     
+    //采集数据
+    public void CollectDataPoint()
+    {
+        DataPoint point=CreatDataPoint();
         
         // 添加到数据列表
         dataPoints.Add(point);
@@ -79,6 +91,7 @@ public class DataCollector : MonoBehaviour
             AnalyzeData();
         }
     }
+
     
     private void AnalyzeData()
     {
@@ -116,7 +129,25 @@ public class DataCollector : MonoBehaviour
         // 触发分析完成事件
         OnAnalysisCompleted?.Invoke();
     }
-    
+
+
+    // 重置数据
+    public void ResetData()
+    {
+        dataPoints.Clear();
+        lastVolumeChangeTime = Time.time;
+        averagePVProduct = 0;
+        pvStandardDeviation = 0;
+        maxErrorPercentage = 0;
+    }
+
+    // 检查是否需要更多数据
+    public bool NeedMoreData()
+    {
+        return dataPoints.Count < 3;
+    }
+
+    #region 检查是否验证实验
     // 检查是否验证了玻意耳定律
     public bool IsBoyleLawVerified()
     {
@@ -176,7 +207,10 @@ public class DataCollector : MonoBehaviour
         
         return maxError < 3.0f;
     }
-    
+
+    #endregion
+
+    #region 数据获取接口
     // 获取数据点
     public List<DataPoint> GetDataPoints()
     {
@@ -199,25 +233,11 @@ public class DataCollector : MonoBehaviour
         return maxErrorPercentage;
     }
     
-    // 重置数据
-    public void ResetData()
-    {
-        dataPoints.Clear();
-        lastVolumeChangeTime = Time.time;
-        averagePVProduct = 0;
-        pvStandardDeviation = 0;
-        maxErrorPercentage = 0;
-    }
-    
     // 获取数据点数量
     public int GetDataPointCount()
     {
         return dataPoints.Count;
     }
-    
-    // 检查是否需要更多数据
-    public bool NeedMoreData()
-    {
-        return dataPoints.Count < 3;
-    }
+
+    #endregion
 }

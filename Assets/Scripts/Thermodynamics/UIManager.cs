@@ -3,7 +3,6 @@
 public class UIManager : MonoBehaviour
 {
     // 引用
-    public IdealGasSimulation gasSimulation;
     public CylinderController cylinderController;
     public DataCollector dataCollector;
     public GraphRenderer graphRenderer;
@@ -12,7 +11,7 @@ public class UIManager : MonoBehaviour
     private void Start()
     {
         // 初始化事件监听
-        gasSimulation.OnStateChanged += OnStateChanged;
+        IdealGasSimulation.Instance.OnStateChanged += OnStateChanged;
         cylinderController.OnVolumeChanged += OnVolumeChanged;
         cylinderController.OnVolumeRangeExceeded += OnVolumeRangeExceeded;
         dataCollector.OnDataCollected += OnDataCollected;
@@ -30,7 +29,7 @@ public class UIManager : MonoBehaviour
     private void OnVolumeChanged(float newVolume)
     {
         // 体积变化时更新气体状态
-        gasSimulation.SetVolume(newVolume);
+        IdealGasSimulation.Instance.SetVolume(newVolume);
         // 通知数据收集器
         dataCollector.OnVolumeChanged(newVolume);
     }
