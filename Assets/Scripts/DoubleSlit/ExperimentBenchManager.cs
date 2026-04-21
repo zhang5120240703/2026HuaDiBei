@@ -3,635 +3,672 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+[System.Serializable] public class StringEvent : UnityEvent<string> { }
+
 /// <summary>
-/// 实验台交互总控制器
-/// ─ 功能：
-///   1. 鼠标拖拽器材（沿光具座轴向限制移动）
-///   2. 智能吸附辅助（靠近推荐位置自动吸附）
-///   3. 器材放置验证（位置顺序、光轴高度、间距合理性）
-///   4. 引导提示（高亮下一个需要放置的器材）
-///   5. 自动对齐 / 复位功能
-/// ─ 使用方式：
-///   在场景中创建空 GameObject，挂载此脚本
-///   在 Inspector 中分别指定 4 个器材和光具座引用
+/// 实验台交互总控制器（3D 移动版）
+///
+/// ══ 操作方式 ══
+///   左键拖拽          → 在水平 XZ 平面内移动（沿光具座前后 + 左右微调）
+///   拖拽时滚轮        → 调节高度（Y 轴）
+///   Shift + 左键拖拽  → 纯高度调节（Y 轴），鼠标上下对应升降
+///   Ctrl  + 左键拖拽  → 纯 X 轴平移（左右对准光轴）
+///
+/// ══ 核心技术 ══
+///   使用"屏幕空间增量"方案代替平面射线法：
+///   每帧把鼠标像素增量 × worldPerPixel 转成世界坐标增量，
+///   再投影到目标轴（XZ / Y / X），彻底消除相机角度导致的位移放大问题。
 /// </summary>
+[AddComponentMenu("DoubleSlit/Experiment Bench Manager")]
 public class ExperimentBenchManager : MonoBehaviour
 {
     // ══════════════════════════════════════════════
-    //  Inspector 字段
+    //  实验器材引用
     // ══════════════════════════════════════════════
 
-    [Header("── 实验器材引用 ──")]
+    [Header("── 实验器材引用（必填）──")]
     public ExperimentItem lightSource;
     public ExperimentItem singleSlit;
     public ExperimentItem doubleSlit;
     public ExperimentItem screen;
 
-    [Header("── 光具座设置 ──")]
-    [Tooltip("光具座的 Transform（器材沿其 +Z 轴方向排列）")]
+    // ══════════════════════════════════════════════
+    //  光具座 / 光轴设置
+    // ══════════════════════════════════════════════
+
+    [Header("── 光具座 & 光轴 ──")]
+    [Tooltip("光具座 Transform，用于判断器材排列顺序（前后关系沿其 forward 轴）。")]
     public Transform benchTransform;
 
-    [Tooltip("器材在光具座上的世界 Y 高度（光轴高度）")]
-    public float benchItemY = 1.05f;
+    [Tooltip("光具座上器材排列的本地轴方向（默认 Forward = +Z 轴）。\n" +
+             "查看场景 Gizmo 中的青色箭头，如方向不对请换选 Right。")]
+    public BenchAxisChoice benchAxis = BenchAxisChoice.Forward;
 
-    [Tooltip("光具座可用范围：从起点到终点的本地 Z 坐标（通常负值→正值）")]
-    public float benchZMin = -2.8f;
-    public float benchZMax =  2.8f;
+    [Tooltip("光轴的世界 Y 坐标（光源中心高度）。\n" +
+             "设定方法：在 Editor 中选中任意器材，查看 Transform.Position.y，填入此处。")]
+    public float opticalAxisY = 1.05f;
 
-    [Header("── 移动辅助 ──")]
-    [Tooltip("相邻器材的最小间距（米），防止重叠")]
-    public float minItemSpacing = 0.25f;
+    [Tooltip("光轴的世界 X 坐标（光轴横向中心，通常为 0 或光具座中线 X）。\n" +
+             "设定方法：光具座中心的 X 坐标值。")]
+    public float opticalAxisX = 0f;
 
-    [Tooltip("开启吸附辅助（靠近推荐位置时自动磁吸）")]
+    // ══════════════════════════════════════════════
+    //  3D 运动边界
+    // ══════════════════════════════════════════════
+
+    [Header("── 3D 运动范围（世界坐标）──")]
+    [Tooltip("器材可移动区域的最小角坐标（世界空间）。\n" +
+             "设定方法：把一个器材拖到允许的最左/最低/最前端，记下其世界坐标填入。\n" +
+             "X: 左右范围下界  Y: 高度范围下界  Z: 前后范围下界（或用 Gizmo 拖拽调整）")]
+    public Vector3 boundsMin = new Vector3(-0.5f, 0.7f, -3.0f);
+
+    [Tooltip("器材可移动区域的最大角坐标（世界空间）。\n" +
+             "X: 左右范围上界  Y: 高度范围上界  Z: 前后范围上界")]
+    public Vector3 boundsMax = new Vector3(0.5f, 1.6f, 3.0f);
+
+    // ══════════════════════════════════════════════
+    //  拖拽设置
+    // ══════════════════════════════════════════════
+
+    [Header("── 拖拽灵敏度 ──")]
+    [Tooltip("XZ 平面拖拽灵敏度乘数（1.0 = 鼠标移多少像素物体走多少世界单位 × perspCorrect）")]
+    [Range(0.5f, 3f)]
+    public float xzSensitivity = 1.0f;
+
+    [Tooltip("Shift 拖拽或滚轮调高时的 Y 轴灵敏度（米/像素 或 米/格）")]
+    [Range(0.5f, 5f)]
+    public float ySensitivity = 1.5f;
+
+    [Tooltip("滚轮每格调节的高度（米）")]
+    [Range(0.01f, 0.2f)]
+    public float scrollYStep = 0.05f;
+
+    [Tooltip("相邻器材最小间距（米，防止穿透）")]
+    [Range(0.05f, 1f)]
+    public float minSpacing = 0.22f;
+
+    // ══════════════════════════════════════════════
+    //  磁吸辅助
+    // ══════════════════════════════════════════════
+
+    [Header("── 磁吸辅助 ──")]
     public bool enableSnapAssist = true;
 
-    [Tooltip("触发磁吸的半径范围（米）")]
-    [Range(0.1f, 1.5f)]
-    public float snapRadius = 0.6f;
+    [Tooltip("磁吸触发半径（米，3D 距离）")]
+    [Range(0.05f, 1f)]
+    public float snapRadius = 0.35f;
 
-    [Header("── 推荐位置（光具座本地 Z 坐标）──")]
-    [Tooltip("推荐位置仅作辅助，不强制")]
-    public float recommendedLightZ      = -2.2f;
-    public float recommendedSingleSlitZ = -1.0f;
-    public float recommendedDoubleSlitZ = -0.1f;
-    public float recommendedScreenZ     =  1.8f;
+    [Header("── 推荐位置（世界坐标）──")]
+    [Tooltip("各器材推荐位置。X/Y 建议填 opticalAxisX / opticalAxisY（即光轴坐标）。\n" +
+             "Z 值：按实验要求设定各器材前后距离。\n" +
+             "调试方法：Play 后将器材拖到理想位置，Inspector → 调试 区域会显示当前世界坐标。")]
+    public Vector3 snapPosLight = new Vector3(0f, 1.05f, -2.2f);
+    public Vector3 snapPosSingle = new Vector3(0f, 1.05f, -0.9f);
+    public Vector3 snapPosDouble = new Vector3(0f, 1.05f, 0.1f);
+    public Vector3 snapPosScreen = new Vector3(0f, 1.05f, 1.8f);
 
-    [Header("── 验证参数 ──")]
-    [Tooltip("高度容差：Y 偏差超过此值视为高度未对齐（米）")]
+    // ══════════════════════════════════════════════
+    //  验证参数
+    // ══════════════════════════════════════════════
+
+    [Header("── 验证容差 ──")]
+    [Tooltip("Y 轴容差（米）：偏离光轴高度超过此值视为「高度未对齐」")]
+    [Range(0.01f, 0.3f)]
     public float heightTolerance = 0.08f;
 
-    [Tooltip("顺序容差：Z 差值需大于此值才认为顺序正确（米）")]
-    public float orderMinGap = 0.15f;
+    [Tooltip("X 轴容差（米）：偏离光轴中心超过此值视为「横向偏移过大」")]
+    [Range(0.01f, 0.3f)]
+    public float xAlignTolerance = 0.06f;
 
-    [Header("── 引导高亮 ──")]
-    [Tooltip("开启「下一步提示」：自动高亮未正确放置的第一个器材")]
+    [Tooltip("顺序判定最小间距（米）：前后器材沿光具座 Z 差值需大于此值")]
+    [Range(0.05f, 0.5f)]
+    public float orderMinGap = 0.12f;
+
+    [Header("── 引导提示 ──")]
     public bool enableStepGuide = true;
+
+    // ══════════════════════════════════════════════
+    //  事件回调
+    // ══════════════════════════════════════════════
 
     [Header("── 事件回调 ──")]
     public UnityEvent onExperimentCorrect;
     public UnityEvent onExperimentIncorrect;
-    public UnityEvent<string> onHintMessage;   // 传递提示文字
+    public StringEvent onHintMessage;
+
+    // ══════════════════════════════════════════════
+    //  调试（只读）
+    // ══════════════════════════════════════════════
+
+    [Header("── 调试（只读，运行时查看）──")]
+    [SerializeField] private string _debugDragMode;
+    [SerializeField] private Vector3 _debugDragPos;
+    [SerializeField] private Vector3 _debugLightPos, _debugSSPos, _debugDSPos, _debugScrPos;
+
+    // ══════════════════════════════════════════════
+    //  枚举
+    // ══════════════════════════════════════════════
+
+    public enum BenchAxisChoice { Forward, Right, Up }
+
+    private enum DragMode { XZ, YOnly, XOnly }   // 根据修饰键切换
 
     // ══════════════════════════════════════════════
     //  私有字段
     // ══════════════════════════════════════════════
 
-    private Camera          _mainCam;
-    private ExperimentItem  _dragging;           // 当前拖拽的器材
-    private Plane           _dragPlane;          // 水平拖拽平面（Y 固定）
-    private float           _dragLocalZOffset;   // 抓取时的局部 Z 偏移（防跳变）
-    private bool            _hasValidated;
+    private Camera _cam;
+    private ExperimentItem _dragging;
+    private DragMode _dragMode;
+    private Vector2 _prevMouseScreen;   // 上一帧鼠标屏幕位置（Vector2）
+    private bool _isDragActive;
 
-    // 4 个器材按顺序排列，便于循环处理
     private ExperimentItem[] _items;
-
-    // 推荐吸附位置（世界坐标，Awake 时计算）
     private Dictionary<ExperimentItem, Vector3> _snapTargets;
 
-    // 验证防抖：放开鼠标后延迟 0.1s 再验证，避免频繁触发
-    private Coroutine _validateCoroutine;
-
-    // 上一帧的鼠标位置（用于性能剔除）
-    private Vector3 _lastMousePos;
+    private Coroutine _validateCo;
 
     // ══════════════════════════════════════════════
-    //  Unity 生命周期
+    //  生命周期
     // ══════════════════════════════════════════════
 
     void Awake()
     {
-        _mainCam = Camera.main;
+        _cam = Camera.main;
+        if (_cam == null)
+            Debug.LogError("[BenchManager] 找不到 MainCamera！");
 
-        _items = new ExperimentItem[]
-        {
-            lightSource, singleSlit, doubleSlit, screen
-        };
-
-        // 验证引用完整性
+        _items = new[] { lightSource, singleSlit, doubleSlit, screen };
         for (int i = 0; i < _items.Length; i++)
-        {
             if (_items[i] == null)
-                Debug.LogError($"[BenchManager] 器材引用缺失！请在 Inspector 中指定所有 4 个器材。");
-        }
-
-        if (benchTransform == null)
-            Debug.LogError("[BenchManager] 未指定 benchTransform（光具座），器材将无法约束到光轴！");
+                Debug.LogError($"[BenchManager] 器材引用 [{i}] 为空，请在 Inspector 指定！");
 
         BuildSnapTargets();
     }
 
     void Start()
     {
-        // 初始化引导提示
         if (enableStepGuide)
-            StartCoroutine(DelayedGuideUpdate());
+            onHintMessage?.Invoke("💡 左键拖拽移动器材(XZ)  |  拖拽时滚轮调整高度  |  Shift拖拽=纯升降  |  Ctrl拖拽=纯左右");
     }
 
-    // ★ Update 仅在有鼠标输入时做实质工作
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
-        {
-            TryBeginDrag();
-            return;
-        }
+        if (Input.GetMouseButtonDown(0)) { TryBeginDrag(); return; }
 
-        if (_dragging != null)
+        if (_isDragActive)
         {
-            if (Input.GetMouseButton(0))
-            {
-                // 性能优化：鼠标未移动则跳过
-                if (Input.mousePosition != _lastMousePos)
-                {
-                    _lastMousePos = Input.mousePosition;
-                    ContinueDrag();
-                }
-            }
-            else
-            {
-                // 鼠标松开
-                EndDrag();
-            }
+            if (Input.GetMouseButton(0)) ContinueDrag();
+            else EndDrag();
         }
     }
 
     // ══════════════════════════════════════════════
-    //  拖拽逻辑
+    //  拖拽核心（屏幕空间增量法）
     // ══════════════════════════════════════════════
 
     private void TryBeginDrag()
     {
-        Ray ray = _mainCam.ScreenPointToRay(Input.mousePosition);
-        if (!Physics.Raycast(ray, out RaycastHit hit, 200f)) return;
+        if (_cam == null) return;
+        Ray ray = _cam.ScreenPointToRay(Input.mousePosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, 300f)) return;
 
-        // 向上查找 ExperimentItem 组件（支持模型有多层子节点）
         ExperimentItem item = hit.collider.GetComponentInParent<ExperimentItem>();
         if (item == null) return;
 
-        // 确认是受管理的器材
         bool managed = false;
         foreach (var i in _items) if (i == item) { managed = true; break; }
         if (!managed) return;
 
-        BeginDrag(item);
-    }
-
-    private void BeginDrag(ExperimentItem item)
-    {
         _dragging = item;
+        _isDragActive = true;
+        _prevMouseScreen = Input.mousePosition;
         item.SetDragging(true);
 
-        // 拖拽平面：水平面，Y = 光轴高度
-        _dragPlane = new Plane(Vector3.up, Vector3.up * benchItemY);
-
-        // 记录抓取时的 Z 偏移，防止器材跳变到鼠标正下方
-        Ray r = _mainCam.ScreenPointToRay(Input.mousePosition);
-        if (_dragPlane.Raycast(r, out float enter))
-        {
-            Vector3 hit = r.GetPoint(enter);
-            if (benchTransform != null)
-            {
-                float hitLocalZ = benchTransform.InverseTransformPoint(hit).z;
-                float itemLocalZ = benchTransform.InverseTransformPoint(item.transform.position).z;
-                _dragLocalZOffset = itemLocalZ - hitLocalZ;
-            }
-        }
-
-        _hasValidated = false;
-        _lastMousePos = Input.mousePosition;
-
-        // 打断验证协程
-        if (_validateCoroutine != null)
-        {
-            StopCoroutine(_validateCoroutine);
-            _validateCoroutine = null;
-        }
+        if (_validateCo != null) { StopCoroutine(_validateCo); _validateCo = null; }
     }
 
     private void ContinueDrag()
     {
         if (_dragging == null) return;
 
-        Ray ray = _mainCam.ScreenPointToRay(Input.mousePosition);
-        if (!_dragPlane.Raycast(ray, out float enter)) return;
+        // ── 当前修饰键决定拖拽模式
+        _dragMode = Input.GetKey(KeyCode.LeftShift) ? DragMode.YOnly
+                  : Input.GetKey(KeyCode.LeftControl) ? DragMode.XOnly
+                  : DragMode.XZ;
+        _debugDragMode = _dragMode.ToString();
 
-        Vector3 worldHit = ray.GetPoint(enter);
+        // ── 鼠标屏幕增量（像素）
+        Vector2 currScreen = Input.mousePosition;
+        Vector2 mouseDelta = currScreen - _prevMouseScreen;
+        _prevMouseScreen = currScreen;
 
-        // 转到光具座本地坐标，限制只能沿 Z 轴（光轴方向）移动
-        float targetLocalZ;
-        if (benchTransform != null)
+        // ── 世界单位/像素（透视矫正：相机越远，一像素对应越大的世界位移）
+        float camDist = Vector3.Distance(_cam.transform.position, _dragging.transform.position);
+        float worldPerPx = 2f * camDist * Mathf.Tan(_cam.fieldOfView * Mathf.Deg2Rad * 0.5f) / Screen.height;
+
+        Vector3 newPos = _dragging.transform.position;
+
+        // ── XZ 平面移动（左键默认）
+        if (_dragMode == DragMode.XZ)
         {
-            float rawLocalZ = benchTransform.InverseTransformPoint(worldHit).z;
-            targetLocalZ = rawLocalZ + _dragLocalZOffset;
+            // 相机右/前方向投影到水平面（去掉 Y 分量）
+            Vector3 camRight = _cam.transform.right; camRight.y = 0f;
+            Vector3 camForward = _cam.transform.forward; camForward.y = 0f;
+
+            // 极端俯视时 XZ 分量接近零，退化为世界轴向
+            if (camRight.sqrMagnitude < 0.01f) { camRight = Vector3.right; }
+            else { camRight.Normalize(); }
+            if (camForward.sqrMagnitude < 0.01f) { camForward = Vector3.forward; }
+            else { camForward.Normalize(); }
+
+            newPos += (camRight * mouseDelta.x + camForward * mouseDelta.y)
+                      * worldPerPx * xzSensitivity;
+
+            // 滚轮调高度（XZ 模式下同时可用）
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (Mathf.Abs(scroll) > 0.001f)
+                newPos.y += scroll * scrollYStep * (scroll > 0 ? 1 : -1);
         }
-        else
+        // ── 纯 Y 轴（Shift）
+        else if (_dragMode == DragMode.YOnly)
         {
-            targetLocalZ = worldHit.z + _dragLocalZOffset;
+            newPos.y += mouseDelta.y * worldPerPx * ySensitivity;
+        }
+        // ── 纯 X 轴（Ctrl）
+        else if (_dragMode == DragMode.XOnly)
+        {
+            Vector3 camRight = _cam.transform.right; camRight.y = 0f;
+            if (camRight.sqrMagnitude < 0.01f) camRight = Vector3.right;
+            else camRight.Normalize();
+            newPos += camRight * mouseDelta.x * worldPerPx * xzSensitivity;
         }
 
-        // 限制到台面范围
-        targetLocalZ = Mathf.Clamp(targetLocalZ, benchZMin, benchZMax);
+        // ── 限制到 3D 边界
+        newPos = ClampToBounds(newPos);
 
-        // 与其他器材做排斥（防止穿透）
-        targetLocalZ = ResolveItemCollisions(_dragging, targetLocalZ);
-
-        // 计算世界坐标（X=0，Y=固定高度）
-        Vector3 newPos;
-        if (benchTransform != null)
-            newPos = benchTransform.TransformPoint(new Vector3(0f, 0f, targetLocalZ));
-        else
-            newPos = new Vector3(_dragging.transform.position.x, benchItemY, targetLocalZ);
-        newPos.y = benchItemY;
+        // ── 排斥（防止与其他器材在 Z 轴穿透）
+        newPos = ResolveCollisions(_dragging, newPos);
 
         _dragging.transform.position = newPos;
+        _debugDragPos = newPos;
 
-        // 检测是否靠近推荐吸附点
-        if (enableSnapAssist && _snapTargets.TryGetValue(_dragging, out Vector3 snapTarget))
-        {
-            float dist = Mathf.Abs(newPos.z - snapTarget.z); // 仅比较沿轴距离
-            _dragging.SetSnapHint(dist < snapRadius);
-        }
+        // ── 高度导引线更新
+        _dragging.UpdateHeightGuide(opticalAxisY, heightTolerance);
+
+        // ── 磁吸提示（靠近时变绿）
+        if (enableSnapAssist && _snapTargets.TryGetValue(_dragging, out Vector3 snapPos))
+            _dragging.SetSnapHint(Vector3.Distance(newPos, snapPos) < snapRadius);
     }
 
     private void EndDrag()
     {
-        if (_dragging == null) return;
-
-        // 如果靠近推荐位置，执行磁吸
+        // 松手磁吸
+        bool isSnapped = false;
         if (enableSnapAssist && _snapTargets.TryGetValue(_dragging, out Vector3 snapPos))
         {
-            float dist = Vector3.Distance(_dragging.transform.position, snapPos);
-            if (dist < snapRadius)
+            if (Vector3.Distance(_dragging.transform.position, snapPos) < snapRadius)
             {
                 _dragging.transform.position = snapPos;
-                onHintMessage?.Invoke($"✓ {_dragging.displayName} 已吸附到推荐位置");
+                onHintMessage?.Invoke($"✔ {_dragging.displayName} 已吸附到推荐位置");
+                isSnapped = true;
             }
         }
 
         _dragging.SetDragging(false);
-        ExperimentItem released = _dragging;
-        _dragging = null;
-
-        // 延迟验证（避免鼠标抖动导致连续触发）
-        if (_validateCoroutine != null) StopCoroutine(_validateCoroutine);
-        _validateCoroutine = StartCoroutine(DeferredValidate());
-
-        // 更新引导提示
-        if (enableStepGuide)
-            StartCoroutine(DelayedGuideUpdate());
-    }
-
-    // ══════════════════════════════════════════════
-    //  碰撞排斥（防止器材相互穿透）
-    // ══════════════════════════════════════════════
-
-    private float ResolveItemCollisions(ExperimentItem movingItem, float desiredLocalZ)
-    {
-        foreach (ExperimentItem other in _items)
+        if (isSnapped)
         {
-            if (other == null || other == movingItem) continue;
-
-            float otherLocalZ = benchTransform != null
-                ? benchTransform.InverseTransformPoint(other.transform.position).z
-                : other.transform.position.z;
-
-            float diff = desiredLocalZ - otherLocalZ;
-            if (Mathf.Abs(diff) < minItemSpacing)
-            {
-                // 向被拖拽方向推开
-                float push = minItemSpacing * Mathf.Sign(diff == 0f ? 1f : diff);
-                desiredLocalZ = otherLocalZ + push;
-            }
+            _dragging.SetValidationResult(true);
         }
-        return desiredLocalZ;
     }
 
     // ══════════════════════════════════════════════
-    //  验证逻辑
+    //  边界 & 碰撞
+    // ══════════════════════════════════════════════
+
+    private Vector3 ClampToBounds(Vector3 p) => new Vector3(
+        Mathf.Clamp(p.x, boundsMin.x, boundsMax.x),
+        Mathf.Clamp(p.y, boundsMin.y, boundsMax.y),
+        Mathf.Clamp(p.z, boundsMin.z, boundsMax.z)
+    );
+
+    /// <summary>
+    /// 排斥：防止器材在光具座轴向（Z）上穿透。
+    /// X/Y 不做排斥（可以在不同高度"错位"放置）。
+    /// </summary>
+    private Vector3 ResolveCollisions(ExperimentItem moving, Vector3 desiredPos)
+    {
+        float desiredT = GetBenchT(desiredPos);
+
+        for (int iter = 0; iter < 3; iter++)
+        {
+            bool changed = false;
+            foreach (ExperimentItem other in _items)
+            {
+                if (other == null || other == moving) continue;
+                float otherT = GetBenchT(other.transform.position);
+                float diff = desiredT - otherT;
+
+                if (Mathf.Abs(diff) < minSpacing)
+                {
+                    float sign = diff >= 0f ? 1f : -1f;
+                    desiredT = otherT + sign * minSpacing;
+                    changed = true;
+                }
+            }
+            if (!changed) break;
+        }
+
+        // 把修正后的 T 值写回位置（只改 bench 轴向分量，X/Y 保持原值）
+        float correctedT = Mathf.Clamp(desiredT, BenchTFromWorld(boundsMin), BenchTFromWorld(boundsMax));
+        Vector3 benchDir = BenchDir;
+        Vector3 origin = BenchOrigin;
+        // 在目标位置上沿 bench 轴方向做修正
+        float origT = GetBenchT(desiredPos);
+        desiredPos += benchDir * (correctedT - origT);
+        return desiredPos;
+    }
+
+    // ══════════════════════════════════════════════
+    //  验证
     // ══════════════════════════════════════════════
 
     private IEnumerator DeferredValidate()
     {
         yield return new WaitForSeconds(0.12f);
         ValidateSetup();
-        _validateCoroutine = null;
+        _validateCo = null;
     }
 
-    /// <summary>
-    /// 验证当前实验器材摆放是否正确
-    /// 返回包含所有错误信息的 ValidationResult
-    /// </summary>
     public ValidationResult ValidateSetup()
     {
-        ValidationResult result = new ValidationResult();
+        var result = new ValidationResult();
+        if (!AllAssigned()) { result.AddError("存在未指定的器材引用"); return result; }
 
-        if (!AllItemsAssigned())
-        {
-            result.AddError("存在未指定的实验器材引用，请检查 Inspector");
-            return result;
-        }
+        float lT = GetBenchT(lightSource.transform.position);
+        float ssT = GetBenchT(singleSlit.transform.position);
+        float dsT = GetBenchT(doubleSlit.transform.position);
+        float scT = GetBenchT(screen.transform.position);
 
-        float lZ  = GetLocalZ(lightSource);
-        float ssZ = GetLocalZ(singleSlit);
-        float dsZ = GetLocalZ(doubleSlit);
-        float scZ = GetLocalZ(screen);
+        // 1. 顺序
+        if (lT >= ssT - orderMinGap) result.AddError($"❌ {lightSource.displayName} 需排在 {singleSlit.displayName} 前方");
+        if (ssT >= dsT - orderMinGap) result.AddError($"❌ {singleSlit.displayName} 需排在 {doubleSlit.displayName} 前方");
+        if (dsT >= scT - orderMinGap) result.AddError($"❌ {doubleSlit.displayName} 需排在 {screen.displayName} 前方");
 
-        // ── 1. 顺序检查（光源 → 单缝 → 双缝 → 光屏）
-        if (lZ >= ssZ - orderMinGap)
-            result.AddError("❌ 光源需在单缝左侧（单缝应在光源后方）");
-        if (ssZ >= dsZ - orderMinGap)
-            result.AddError("❌ 单缝需在双缝左侧（双缝应在单缝后方）");
-        if (dsZ >= scZ - orderMinGap)
-            result.AddError("❌ 双缝需在光屏左侧（光屏应在双缝后方）");
-
-        // ── 2. 高度对齐检查（所有器材 Y 坐标应接近）
+        // 2. 光轴 Y 对齐
         foreach (ExperimentItem item in _items)
         {
-            float yDiff = Mathf.Abs(item.transform.position.y - benchItemY);
-            if (yDiff > heightTolerance)
-                result.AddError($"❌ {item.displayName} 高度偏差 {yDiff * 100f:F1}cm（需与光轴对齐）");
+            float dy = Mathf.Abs(item.transform.position.y - opticalAxisY);
+            if (dy > heightTolerance)
+                result.AddError($"❌ {item.displayName} 高度偏差 {dy * 100f:F1}cm（需与光轴对齐 Y={opticalAxisY:F2}）");
         }
 
-        // ── 3. 范围检查（所有器材需在光具座有效范围内）
+        // 3. 光轴 X 对齐
         foreach (ExperimentItem item in _items)
         {
-            float z = GetLocalZ(item);
-            if (z < benchZMin || z > benchZMax)
-                result.AddError($"❌ {item.displayName} 超出光具座范围");
+            float dx = Mathf.Abs(item.transform.position.x - opticalAxisX);
+            if (dx > xAlignTolerance)
+                result.AddError($"❌ {item.displayName} 横向偏差 {dx * 100f:F1}cm（需对准光轴中心 X={opticalAxisX:F2}）");
+        }
+
+        // 4. 边界检查
+        foreach (ExperimentItem item in _items)
+        {
+            Vector3 p = item.transform.position;
+            if (p.x < boundsMin.x || p.x > boundsMax.x ||
+                p.y < boundsMin.y || p.y > boundsMax.y ||
+                p.z < boundsMin.z || p.z > boundsMax.z)
+                result.AddError($"❌ {item.displayName} 超出实验台范围");
         }
 
         result.isCorrect = result.errors.Count == 0;
-
-        // ── 视觉反馈
-        ApplyValidationFeedback(result);
-
-        _hasValidated = true;
+        ApplyFeedback(result);
 
         if (result.isCorrect)
         {
             onExperimentCorrect?.Invoke();
-            onHintMessage?.Invoke("✅ 实验器材放置正确！可以开始观察干涉条纹。");
+            onHintMessage?.Invoke("✅ 放置正确！可以开始观察双缝干涉条纹。");
         }
         else
         {
             onExperimentIncorrect?.Invoke();
-            if (result.errors.Count > 0)
-                onHintMessage?.Invoke(result.errors[0]);
+            onHintMessage?.Invoke(result.errors[0]);
         }
-
         return result;
     }
 
-    private void ApplyValidationFeedback(ValidationResult result)
+    private void ApplyFeedback(ValidationResult r)
     {
-        if (result.isCorrect)
-        {
-            foreach (ExperimentItem item in _items)
-                item.SetValidationResult(true);
-        }
-        else
-        {
-            // 分别检查每个器材是否参与了错误
-            bool lCorrect  = !result.IsItemInError(lightSource.displayName);
-            bool ssCorrect = !result.IsItemInError(singleSlit.displayName);
-            bool dsCorrect = !result.IsItemInError(doubleSlit.displayName);
-            bool scCorrect = !result.IsItemInError(screen.displayName);
-
-            lightSource.SetValidationResult(lCorrect);
-            singleSlit .SetValidationResult(ssCorrect);
-            doubleSlit .SetValidationResult(dsCorrect);
-            screen     .SetValidationResult(scCorrect);
-        }
+        if (r.isCorrect) { foreach (var it in _items) it.SetValidationResult(true); return; }
+        lightSource.SetValidationResult(IsItemCorrect(lightSource));
+        singleSlit.SetValidationResult(IsItemCorrect(singleSlit));
+        doubleSlit.SetValidationResult(IsItemCorrect(doubleSlit));
+        screen.SetValidationResult(IsItemCorrect(screen));
     }
 
-    // ══════════════════════════════════════════════
-    //  引导提示（高亮下一步需要操作的器材）
-    // ══════════════════════════════════════════════
-
-    private IEnumerator DelayedGuideUpdate()
+    private bool IsItemCorrect(ExperimentItem item)
     {
-        yield return new WaitForSeconds(0.15f);
-        UpdateStepGuide();
-    }
-
-    private void UpdateStepGuide()
-    {
-        if (!enableStepGuide) return;
-
-        // 按顺序检测哪个器材最先「不在正确位置」
-        ExperimentItem[] ordered = { lightSource, singleSlit, doubleSlit, screen };
-
-        float prevZ = benchZMin - 1f;
-        ExperimentItem firstWrong = null;
-
-        for (int i = 0; i < ordered.Length; i++)
-        {
-            if (ordered[i] == null) continue;
-            float z = GetLocalZ(ordered[i]);
-            bool orderOK = (z > prevZ + orderMinGap);
-
-            if (!orderOK || !IsInBenchRange(z))
-            {
-                firstWrong = ordered[i];
-                break;
-            }
-            prevZ = z;
-        }
-
-        // 发送提示
-        if (firstWrong != null)
-        {
-            string hint = GetItemPlacementHint(firstWrong);
-            onHintMessage?.Invoke(hint);
-        }
-    }
-
-    private string GetItemPlacementHint(ExperimentItem item)
-    {
-        return item.itemType switch
-        {
-            ExperimentItemType.LightSource =>
-                $"💡 请将【{item.displayName}】放置在光具座最左端",
-            ExperimentItemType.SingleSlit =>
-                $"🔲 请将【{item.displayName}】放置在光源右侧",
-            ExperimentItemType.DoubleSlit =>
-                $"🔳 请将【{item.displayName}】放置在单缝右侧",
-            ExperimentItemType.Screen =>
-                $"📺 请将【{item.displayName}（光屏）】放置在最右端",
-            _ => $"请调整【{item.displayName}】的位置"
-        };
-    }
-
-    // ══════════════════════════════════════════════
-    //  辅助功能（可绑定到 UI 按钮）
-    // ══════════════════════════════════════════════
-
-    /// <summary>
-    /// 一键自动对齐：将所有器材移动到推荐位置
-    /// 可绑定到「自动对齐」按钮
-    /// </summary>
-    public void AutoAlignAll()
-    {
-        foreach (ExperimentItem item in _items)
-        {
-            if (item == null) continue;
-            if (_snapTargets.TryGetValue(item, out Vector3 target))
-            {
-                item.transform.position = target;
-                item.ClearHighlight();
-            }
-        }
-
-        onHintMessage?.Invoke("🔧 已自动对齐到推荐位置，请观察干涉图样。");
-
-        if (_validateCoroutine != null) StopCoroutine(_validateCoroutine);
-        _validateCoroutine = StartCoroutine(DeferredValidate());
-    }
-
-    /// <summary>
-    /// 复位所有器材到实验开始前的位置
-    /// 可绑定到「重置实验」按钮
-    /// </summary>
-    public void ResetAll()
-    {
-        if (_dragging != null)
-        {
-            _dragging.SetDragging(false);
-            _dragging = null;
-        }
-
-        foreach (ExperimentItem item in _items)
-            item?.ResetToHome();
-
-        _hasValidated = false;
-        onHintMessage?.Invoke("🔄 实验已重置，请重新摆放器材。");
-
-        if (enableStepGuide)
-            StartCoroutine(DelayedGuideUpdate());
-    }
-
-    /// <summary>
-    /// 手动触发验证（可绑定到「检查」按钮）
-    /// </summary>
-    public void TriggerValidate()
-    {
-        ValidateSetup();
-    }
-
-    /// <summary>
-    /// 切换吸附辅助开关（可绑定到 Toggle）
-    /// </summary>
-    public void SetSnapAssist(bool enabled)
-    {
-        enableSnapAssist = enabled;
-        string state = enabled ? "开启" : "关闭";
-        onHintMessage?.Invoke($"磁吸辅助已{state}");
-    }
-
-    // ══════════════════════════════════════════════
-    //  内部工具
-    // ══════════════════════════════════════════════
-
-    private void BuildSnapTargets()
-    {
-        _snapTargets = new Dictionary<ExperimentItem, Vector3>(4);
-        if (benchTransform == null) return;
-
-        AddSnap(lightSource, recommendedLightZ);
-        AddSnap(singleSlit,  recommendedSingleSlitZ);
-        AddSnap(doubleSlit,  recommendedDoubleSlitZ);
-        AddSnap(screen,      recommendedScreenZ);
-    }
-
-    private void AddSnap(ExperimentItem item, float localZ)
-    {
-        if (item == null) return;
-        Vector3 worldPos = benchTransform.TransformPoint(new Vector3(0f, 0f, localZ));
-        worldPos.y = benchItemY;
-        _snapTargets[item] = worldPos;
-    }
-
-    private float GetLocalZ(ExperimentItem item)
-    {
-        if (benchTransform != null)
-            return benchTransform.InverseTransformPoint(item.transform.position).z;
-        return item.transform.position.z;
-    }
-
-    private bool IsInBenchRange(float localZ)
-        => localZ >= benchZMin && localZ <= benchZMax;
-
-    private bool AllItemsAssigned()
-    {
-        foreach (ExperimentItem item in _items)
-            if (item == null) return false;
+        if (!_snapTargets.TryGetValue(item, out Vector3 snapPos)) return false;
+        Vector3 pos = item.transform.position;
+        if (Vector3.Distance(pos, snapPos) > snapRadius) return false;
+        if (Mathf.Abs(pos.y - opticalAxisY) > heightTolerance) return false;
+        if (Mathf.Abs(pos.x - opticalAxisX) > xAlignTolerance) return false;
         return true;
     }
 
     // ══════════════════════════════════════════════
-    //  Editor Gizmo
+    //  放置后引导提示
+    // ══════════════════════════════════════════════
+
+    private void PostDropGuide(ExperimentItem released)
+    {
+        // 检查该器材的当前三轴偏差，给出针对性提示
+        Vector3 pos = released.transform.position;
+        float dy = Mathf.Abs(pos.y - opticalAxisY);
+        float dx = Mathf.Abs(pos.x - opticalAxisX);
+
+        if (dy > heightTolerance)
+        {
+            float diff = pos.y - opticalAxisY;
+            onHintMessage?.Invoke($"↕ {released.displayName} 高度偏差 {dy * 100f:F1}cm " +
+                                  (diff > 0 ? "（偏高，拖拽时滚轮向下）" : "（偏低，拖拽时滚轮向上）"));
+            return;
+        }
+        if (dx > xAlignTolerance)
+        {
+            float diff = pos.x - opticalAxisX;
+            onHintMessage?.Invoke($"↔ {released.displayName} 横向偏差 {dx * 100f:F1}cm " +
+                                  (diff > 0 ? "（偏右，Ctrl拖拽向左）" : "（偏左，Ctrl拖拽向右）"));
+            return;
+        }
+
+        // 顺序检查
+        float prevT = float.MinValue;
+        foreach (ExperimentItem item in _items)
+        {
+            if (item == null) continue;
+            float t = GetBenchT(item.transform.position);
+            if (t <= prevT + orderMinGap)
+            {
+                onHintMessage?.Invoke(item.itemType switch
+                {
+                    ExperimentItem.ApparatusType.LightSource => $"💡 {item.displayName} 需放到最前端",
+                    ExperimentItem.ApparatusType.SingleSlit => $"🔲 {item.displayName} 需放到光源后方",
+                    ExperimentItem.ApparatusType.DoubleSlit => $"🔳 {item.displayName} 需放到单缝后方",
+                    ExperimentItem.ApparatusType.Screen => $"📺 {item.displayName} 需放到最末端",
+                    _ => ""
+                });
+                return;
+            }
+            prevT = t;
+        }
+    }
+
+    // ══════════════════════════════════════════════
+    //  公开功能（UI 按钮绑定）
+    // ══════════════════════════════════════════════
+
+    /// <summary>一键自动对齐到推荐位置（完整 3D 对齐）</summary>
+    public void AutoAlignAll()
+    {
+        if (_dragging != null) { _dragging.SetDragging(false); _dragging = null; _isDragActive = false; }
+        foreach (ExperimentItem item in _items)
+        {
+            if (item == null || !_snapTargets.TryGetValue(item, out Vector3 p)) continue;
+            item.transform.position = p;
+            item.ClearHighlight();
+        }
+        onHintMessage?.Invoke("🔧 已自动对齐到推荐位置（光轴中心 + 推荐前后距离）");
+        if (_validateCo != null) StopCoroutine(_validateCo);
+        _validateCo = StartCoroutine(DeferredValidate());
+    }
+
+    public void ResetAll()
+    {
+        if (_dragging != null) { _dragging.SetDragging(false); _dragging = null; _isDragActive = false; }
+        foreach (ExperimentItem it in _items) it?.ResetToHome();
+        onHintMessage?.Invoke("🔄 已重置，请重新摆放器材");
+    }
+
+    public void TriggerValidate() => ValidateSetup();
+
+    public void SetSnapAssist(bool on)
+    {
+        enableSnapAssist = on;
+        onHintMessage?.Invoke(on ? "磁吸辅助：开启" : "磁吸辅助：关闭");
+    }
+
+    // ══════════════════════════════════════════════
+    //  光具座轴线工具
+    // ══════════════════════════════════════════════
+
+    public enum BenchAxisChoiceDup { Forward, Right, Up }   // 防止命名冲突
+
+    private Vector3 BenchDir
+    {
+        get
+        {
+            if (benchTransform == null) return Vector3.forward;
+            return benchAxis switch
+            {
+                BenchAxisChoice.Right => benchTransform.right,
+                BenchAxisChoice.Up => benchTransform.up,
+                _ => benchTransform.forward
+            };
+        }
+    }
+
+    private Vector3 BenchOrigin
+    {
+        get
+        {
+            if (benchTransform == null) return Vector3.zero;
+            return benchTransform.position;
+        }
+    }
+
+    /// <summary>世界坐标投影到光具座轴线，返回标量 T</summary>
+    private float GetBenchT(Vector3 worldPos)
+        => Vector3.Dot(worldPos - BenchOrigin, BenchDir);
+
+    /// <summary>从世界坐标 boundsMin/Max 的角点反算 T 范围</summary>
+    private float BenchTFromWorld(Vector3 corner)
+        => GetBenchT(corner);
+
+    private void BuildSnapTargets()
+    {
+        _snapTargets = new Dictionary<ExperimentItem, Vector3>(4);
+        if (lightSource != null) _snapTargets[lightSource] = snapPosLight;
+        if (singleSlit != null) _snapTargets[singleSlit] = snapPosSingle;
+        if (doubleSlit != null) _snapTargets[doubleSlit] = snapPosDouble;
+        if (screen != null) _snapTargets[screen] = snapPosScreen;
+    }
+
+    private bool AllAssigned()
+    {
+        foreach (var it in _items) if (it == null) return false;
+        return true;
+    }
+
+    private void RefreshDebugPos()
+    {
+        if (!AllAssigned()) return;
+        _debugLightPos = lightSource.transform.position;
+        _debugSSPos = singleSlit.transform.position;
+        _debugDSPos = doubleSlit.transform.position;
+        _debugScrPos = screen.transform.position;
+    }
+
+    // ══════════════════════════════════════════════
+    //  Gizmo
     // ══════════════════════════════════════════════
 
 #if UNITY_EDITOR
     void OnDrawGizmos()
     {
-        if (benchTransform == null) return;
+        // 3D 边界框（半透明线框）
+        Vector3 center = (boundsMin + boundsMax) * 0.5f;
+        Vector3 size = boundsMax - boundsMin;
+        Gizmos.color = new Color(0f, 1f, 1f, 0.35f);
+        Gizmos.DrawWireCube(center, size);
 
-        // 绘制光具座有效范围
-        Vector3 start = benchTransform.TransformPoint(new Vector3(0, 0, benchZMin));
-        Vector3 end   = benchTransform.TransformPoint(new Vector3(0, 0, benchZMax));
-        start.y = end.y = benchItemY;
+        // 光轴线（绿色水平线）
+        Vector3 axisStart = new Vector3(boundsMin.x, opticalAxisY, boundsMin.z);
+        Vector3 axisEnd = new Vector3(boundsMax.x, opticalAxisY, boundsMax.z);
+        Gizmos.color = new Color(0.2f, 1f, 0.2f, 0.7f);
+        Gizmos.DrawLine(axisStart, axisEnd);
 
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(start, end);
-        Gizmos.DrawWireSphere(start, 0.05f);
-        Gizmos.DrawWireSphere(end,   0.05f);
-
-        // 绘制推荐位置标记
-        if (_snapTargets == null) return;
-        Color[] colors = { Color.yellow, Color.green, Color.blue, Color.red };
-        int idx = 0;
-        foreach (var kv in _snapTargets)
+        // 推荐位置小立方体
+        (Vector3 pos, Color col)[] marks =
         {
-            Gizmos.color = colors[idx % colors.Length];
-            Gizmos.DrawWireCube(kv.Value, Vector3.one * 0.12f);
-            idx++;
+            (snapPosLight,  Color.yellow),
+            (snapPosSingle, Color.green),
+            (snapPosDouble, Color.cyan),
+            (snapPosScreen, Color.red),
+        };
+        foreach (var (p, c) in marks)
+        {
+            Gizmos.color = c;
+            Gizmos.DrawWireCube(p, Vector3.one * 0.1f);
+            // 磁吸半径圈
+            Gizmos.color = new Color(c.r, c.g, c.b, 0.1f);
+            Gizmos.DrawWireSphere(p, snapRadius);
+        }
+
+        // 光具座方向箭头（白色）
+        if (benchTransform != null)
+        {
+            Gizmos.color = Color.white;
+            Vector3 mid = center; mid.y = opticalAxisY;
+            Gizmos.DrawRay(mid, BenchDir * 0.6f);
         }
     }
 
     void OnDrawGizmosSelected()
     {
-        // 绘制吸附半径
-        if (_snapTargets == null) return;
-        Gizmos.color = new Color(0f, 1f, 0.5f, 0.15f);
-        foreach (var kv in _snapTargets)
-            Gizmos.DrawWireSphere(kv.Value, snapRadius);
+        // 光轴 X 中线（浅蓝色垂直面）
+        Vector3 p0 = new Vector3(opticalAxisX, boundsMin.y, boundsMin.z);
+        Vector3 p1 = new Vector3(opticalAxisX, boundsMax.y, boundsMin.z);
+        Vector3 p2 = new Vector3(opticalAxisX, boundsMax.y, boundsMax.z);
+        Vector3 p3 = new Vector3(opticalAxisX, boundsMin.y, boundsMax.z);
+        Gizmos.color = new Color(0.3f, 0.7f, 1f, 0.08f);
+        Gizmos.DrawLine(p0, p1); Gizmos.DrawLine(p1, p2);
+        Gizmos.DrawLine(p2, p3); Gizmos.DrawLine(p3, p0);
     }
 #endif
 }
 
-// ══════════════════════════════════════════════════════
-//  验证结果数据类
-// ══════════════════════════════════════════════════════
+// ════════════════════════════════════════════════
+//  验证结果
+// ════════════════════════════════════════════════
 
 public class ValidationResult
 {
     public bool isCorrect;
-    public List<string> errors = new List<string>(8);
-
-    public void AddError(string msg) => errors.Add(msg);
-
-    /// <summary>检查错误信息中是否包含指定器材名称</summary>
-    public bool IsItemInError(string itemDisplayName)
-    {
-        foreach (string e in errors)
-            if (e.Contains(itemDisplayName)) return true;
-        return false;
-    }
-
+    public System.Collections.Generic.List<string> errors = new(8);
+    public void AddError(string m) => errors.Add(m);
+    public bool IsItemInError(string name)
+    { foreach (var e in errors) if (e.Contains(name)) return true; return false; }
     public override string ToString()
-    {
-        if (isCorrect) return "✅ 放置正确";
-        return string.Join("\n", errors);
-    }
+        => isCorrect ? "✅ 放置正确" : string.Join("\n", errors);
 }

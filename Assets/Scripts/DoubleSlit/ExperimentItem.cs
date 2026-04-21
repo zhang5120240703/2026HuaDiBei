@@ -1,123 +1,204 @@
 using UnityEngine;
 
 /// <summary>
-/// 实验器材类型枚举（同时表示正确摆放顺序：0→1→2→3）
+/// 实验器材基础组件（3D 版）
+/// 新增：垂直高度导引线（LineRenderer），帮助学生直观感知器材高度偏差
 /// </summary>
-public enum ExperimentItemType
-{
-    LightSource = 0,   // 光源
-    SingleSlit  = 1,   // 单缝
-    DoubleSlit  = 2,   // 双缝
-    Screen      = 3    // 光屏
-}
-
-/// <summary>
-/// 挂载在每件可拖拽实验器材上的数据组件。
-/// 负责：类型定义、高亮渲染（零GC）、放置状态记录。
-/// </summary>
-[RequireComponent(typeof(Collider))]
+[DisallowMultipleComponent]
 public class ExperimentItem : MonoBehaviour
 {
-    [Header("器材设置")]
-    public ExperimentItemType itemType;
+    public enum ApparatusType { LightSource = 0, SingleSlit = 1, DoubleSlit = 2, Screen = 3 }
 
-    [Tooltip("拖拽时跟随鼠标的半透明预览物体（为空则自动克隆本物体）")]
-    public GameObject ghostOverride;
+    // ══════════════════════════════════════════════
+    //  Inspector
+    // ══════════════════════════════════════════════
 
-    [Tooltip("需要高亮的渲染器列表（为空则自动查找子物体中的所有 Renderer）")]
-    public Renderer[] highlightRenderers;
+    [Header("器材标识")]
+    public ApparatusType itemType;
+    public string displayName = "器材";
 
-    [Tooltip("落入槽位后相对槽中心的本地位置偏移")]
-    public Vector3 slotOffset = Vector3.zero;
+    [Header("视觉反馈颜色")]
+    public Color draggingColor = new Color(1f, 0.85f, 0f);
+    public Color snapHintColor = new Color(0f, 1f, 0.5f);
+    public Color correctColor = new Color(0.2f, 1f, 0.2f);
+    public Color errorColor = new Color(1f, 0.25f, 0.25f);
 
-    [Header("光轴高度")]
-    [Tooltip("器材光轴距底座的高度（用于光轴对齐校验），单位：世界坐标")]
-    public float opticalAxisHeight = 0.15f;
+    [Header("渲染器（留空自动收集子节点）")]
+    public Renderer[] targetRenderers;
 
-    [HideInInspector] public int   slotIndex = -1;
-    [HideInInspector] public bool  isPlaced  = false;
-    [HideInInspector] public Vector3 parkPos;
+    [Header("鼠标拾取碰撞体（留空自动获取）")]
+    public Collider pickCollider;
 
-    public enum HL { None = 0, Hover = 1, Valid = 2, Error = 3, Placed = 4 }
+    [Header("高度导引线（可选，留空则自动创建）")]
+    [Tooltip("拖拽时显示从器材到光轴高度的垂直辅助线，帮助学生对准光轴")]
+    public LineRenderer heightGuideLine;
 
-    static readonly Color[] _hlColors = {
-        Color.white,
-        new Color(1.00f, 0.92f, 0.20f, 1f),
-        new Color(0.25f, 1.00f, 0.40f, 1f),
-        new Color(1.00f, 0.25f, 0.25f, 1f),
-        new Color(0.25f, 0.85f, 1.00f, 1f),
-    };
-    static readonly float[] _hlEmitIntensity = { 0f, 0.35f, 0.50f, 0.55f, 0.30f };
+    // ══════════════════════════════════════════════
+    //  运行时状态（由 Manager 写入）
+    // ══════════════════════════════════════════════
 
-    MaterialPropertyBlock _mpb;
-    static readonly int _propColor = Shader.PropertyToID("_Color");
-    static readonly int _propEmit  = Shader.PropertyToID("_EmissionColor");
+    [HideInInspector] public bool isDragging;
+    [HideInInspector] public bool isNearSnap;
+    [HideInInspector] public bool isCorrect;
+    [HideInInspector] public Vector3 homePosition;
+
+    // ══════════════════════════════════════════════
+    //  私有字段
+    // ══════════════════════════════════════════════
+
+    private MaterialPropertyBlock[] _mpbs;
+    static readonly int s_Emission = Shader.PropertyToID("_EmissionColor");
+    static readonly int s_BaseCol = Shader.PropertyToID("_BaseColor");
+    static readonly int s_Col = Shader.PropertyToID("_Color");
+
+    private enum VS { None, Dragging, SnapHint, Correct, Error }
+    private VS _curVS = VS.None;
+
+    // ══════════════════════════════════════════════
+    //  初始化
+    // ══════════════════════════════════════════════
 
     void Awake()
     {
-        parkPos = transform.position;
-        _mpb    = new MaterialPropertyBlock();
-        if (highlightRenderers == null || highlightRenderers.Length == 0)
-            highlightRenderers = GetComponentsInChildren<Renderer>(true);
+        homePosition = transform.position;
+
+        if (targetRenderers == null || targetRenderers.Length == 0)
+            targetRenderers = GetComponentsInChildren<Renderer>(true);
+
+        _mpbs = new MaterialPropertyBlock[targetRenderers.Length];
+        for (int i = 0; i < _mpbs.Length; i++)
+            _mpbs[i] = new MaterialPropertyBlock();
+
+        if (pickCollider == null)
+            pickCollider = GetComponentInChildren<Collider>();
+
+        if (pickCollider == null)
+            Debug.LogWarning($"[ExperimentItem] '{displayName}' 缺少 Collider！");
+
+        // 自动创建高度导引线
+        if (heightGuideLine == null)
+            heightGuideLine = CreateHeightGuideLine();
     }
 
-    public void SetHighlight(HL state)
+    void Start()
     {
-        if (highlightRenderers == null) return;
-        int idx = (int)state;
-        Color baseColor = _hlColors[idx];
-        Color emitColor = baseColor * _hlEmitIntensity[idx];
-        _mpb.SetColor(_propColor, baseColor);
-        _mpb.SetColor(_propEmit,  emitColor);
-        foreach (var r in highlightRenderers)
-            if (r != null) r.SetPropertyBlock(_mpb);
+        // 确保导引线初始时隐藏
+        if (heightGuideLine != null)
+            heightGuideLine.enabled = false;
     }
 
-    public float GetOpticalAxisWorldY()
-        => transform.position.y + slotOffset.y + opticalAxisHeight;
+    // ══════════════════════════════════════════════
+    //  公开接口
+    // ══════════════════════════════════════════════
 
-    /// <summary>器材显示名称（用于 UI 提示）</summary>
-    public string displayName => ChineseName();
-
-    /// <summary>设置拖拽状态并更新高亮</summary>
-    public void SetDragging(bool isDragging)
+    public void SetDragging(bool active)
     {
-        SetHighlight(isDragging ? HL.Hover : (isPlaced ? HL.Placed : HL.None));
+        isDragging = active;
+        isNearSnap = false;
+        SetVS(active ? VS.Dragging : VS.None);
+        if (heightGuideLine != null) heightGuideLine.enabled = active;
     }
 
-    /// <summary>显示吸附提示（当鼠标靠近推荐位置时）</summary>
-    public void SetSnapHint(bool show)
+    public void SetSnapHint(bool active)
     {
-        SetHighlight(show ? HL.Valid : (isPlaced ? HL.Placed : HL.None));
+        if (!isDragging) return;
+        isNearSnap = active;
+        SetVS(active ? VS.SnapHint : VS.Dragging);
     }
 
-    /// <summary>设置验证结果的高亮（成功/错误）</summary>
-    public void SetValidationResult(bool isCorrect)
+    public void SetValidationResult(bool correct)
     {
-        SetHighlight(isCorrect ? HL.Placed : HL.Error);
+        isCorrect = correct;
+        if (!isDragging) SetVS(correct ? VS.Correct : VS.Error);
     }
 
-    /// <summary>清除高亮效果</summary>
     public void ClearHighlight()
     {
-        SetHighlight(HL.None);
+        isDragging = false;
+        isNearSnap = false;
+        if (heightGuideLine != null) heightGuideLine.enabled = false;
+        SetVS(VS.None);
     }
 
-    /// <summary>重置器材回到初始停靠位置</summary>
     public void ResetToHome()
     {
-        transform.position = parkPos;
-        isPlaced = false;
-        slotIndex = -1;
+        transform.position = homePosition;
         ClearHighlight();
     }
 
-    public string ChineseName() => itemType switch
+    /// <summary>
+    /// 更新高度导引线：从器材当前位置画垂线到光轴高度
+    /// colorByError: true=偏差大时变红，false=保持中性色
+    /// </summary>
+    public void UpdateHeightGuide(float opticalAxisY, float tolerance)
     {
-        ExperimentItemType.LightSource => "光源",
-        ExperimentItemType.SingleSlit  => "单缝",
-        ExperimentItemType.DoubleSlit  => "双缝",
-        ExperimentItemType.Screen      => "光屏",
-        _                              => "未知器材"
-    };
+        if (heightGuideLine == null || !isDragging) return;
+
+        Vector3 top = transform.position;
+        Vector3 bottom = new Vector3(top.x, opticalAxisY, top.z);
+        heightGuideLine.SetPosition(0, top);
+        heightGuideLine.SetPosition(1, bottom);
+
+        float dy = Mathf.Abs(top.y - opticalAxisY);
+        Color col = dy > tolerance
+            ? Color.Lerp(Color.yellow, Color.red, (dy - tolerance) / tolerance)
+            : new Color(0.5f, 1f, 0.5f, 0.8f);
+        heightGuideLine.startColor = col;
+        heightGuideLine.endColor = new Color(col.r, col.g, col.b, 0.3f);
+    }
+
+    // ══════════════════════════════════════════════
+    //  内部
+    // ══════════════════════════════════════════════
+
+    private void SetVS(VS state)
+    {
+        if (_curVS == state) return;
+        _curVS = state;
+        Color emit = state switch
+        {
+            VS.Dragging => draggingColor * 0.7f,
+            VS.SnapHint => snapHintColor * 0.9f,
+            VS.Correct => correctColor * 0.5f,
+            VS.Error => errorColor * 0.5f,
+            _ => Color.black
+        };
+        for (int i = 0; i < targetRenderers.Length; i++)
+        {
+            if (targetRenderers[i] == null) continue;
+            targetRenderers[i].GetPropertyBlock(_mpbs[i]);
+            _mpbs[i].SetColor(s_Emission, emit);
+            _mpbs[i].SetColor(s_BaseCol, Color.white);
+            _mpbs[i].SetColor(s_Col, Color.white);
+            targetRenderers[i].SetPropertyBlock(_mpbs[i]);
+        }
+    }
+
+    private LineRenderer CreateHeightGuideLine()
+    {
+        var go = new GameObject("_HeightGuide");
+        go.transform.SetParent(transform.parent); // 挂到同级，不随器材旋转
+        var lr = go.AddComponent<LineRenderer>();
+        lr.positionCount = 2;
+        lr.startWidth = 0.012f;
+        lr.endWidth = 0.004f;
+        lr.useWorldSpace = true;
+        lr.receiveShadows = false;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        // 尝试使用粒子/加法混合材质，若无则用默认
+        var mat = Resources.Load<Material>("Sprites/Default");
+        if (mat != null) lr.material = mat;
+        lr.enabled = false;
+        return lr;
+    }
+
+#if UNITY_EDITOR
+    void OnDrawGizmosSelected()
+    {
+        UnityEditor.Handles.Label(
+            transform.position + Vector3.up * 0.35f,
+            $"[{itemType}] {displayName}",
+            new GUIStyle { normal = { textColor = Color.yellow }, fontSize = 11 });
+    }
+#endif
 }

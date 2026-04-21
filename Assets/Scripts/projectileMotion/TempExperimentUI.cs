@@ -19,7 +19,7 @@ public class TempExperimentUI : MonoBehaviour
     private ExperimentStateManager _stateMgr;
     private ExperimentFlowController _flowCtrl;
 
-    // ── 当前显示状态（由事件驱动更新）────────────────────────────────
+    // ── 当前显示状态（由事件驱动更新）────────────────────────────────----
     private ExperimentStep _currentStep = ExperimentStep.Step1_Prepare;
     private ExperimentRunState _runState = ExperimentRunState.Idle;
     private bool _isPaused = false;

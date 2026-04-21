@@ -4,95 +4,72 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// 实验交互 UI 管理器
-/// ─ 功能：
-///   1. 在屏幕上显示实时操作提示和验证结果
-///   2. 步骤进度指示器（4 个器材的放置状态）
-///   3. 控制按钮：自动对齐、重置、检查
-///   4. 操作提示淡入淡出动画
-/// ─ 使用方式：
-///   在 Canvas 下创建 UI 结构后，将此脚本挂载到 Canvas 根节点
-///   在 Inspector 中绑定对应 UI 组件引用
+/// 实验交互 UI 管理器（3D 版）
+/// 新增：实时坐标显示、拖拽模式指示、偏差数值面板
 /// </summary>
+[AddComponentMenu("DoubleSlit/Experiment Hint UI")]
 public class ExperimentHintUI : MonoBehaviour
 {
     // ══════════════════════════════════════════════
-    //  Inspector 字段
+    //  Inspector
     // ══════════════════════════════════════════════
 
-    [Header("── 系统引用 ──")]
-    [Tooltip("ExperimentBenchManager 所在 GameObject")]
+    [Header("── 核心引用 ──")]
     public ExperimentBenchManager benchManager;
 
-    [Header("── 提示文本 ──")]
-    [Tooltip("屏幕底部的操作提示文本框（TextMeshPro）")]
+    [Header("── 操作提示文字 ──")]
     public TextMeshProUGUI hintText;
+    [Range(0f, 10f)] public float hintKeepTime = 4f;
+    [Range(0.1f, 2f)] public float hintFadeTime = 0.5f;
 
-    [Tooltip("提示出现后多少秒自动淡出（0 = 不淡出）")]
-    [Range(0f, 10f)]
-    public float hintDisplayTime = 4f;
+    [Header("── 拖拽模式指示器 ──")]
+    [Tooltip("显示当前拖拽模式的文本（XZ / Y轴 / X轴）")]
+    public TextMeshProUGUI dragModeText;
 
-    [Tooltip("淡出动画时长")]
-    [Range(0.2f, 2f)]
-    public float hintFadeDuration = 0.6f;
+    [Tooltip("操作说明标签（常驻，不淡出）")]
+    public TextMeshProUGUI controlHintText;
 
-    [Header("── 步骤进度 ──")]
-    [Tooltip("4 个步骤图标（Image），对应光源/单缝/双缝/光屏")]
-    public Image[] stepIcons;           // 长度需为 4
+    [Header("── 实时坐标面板（拖拽时显示）──")]
+    [Tooltip("拖拽时弹出的坐标面板根节点")]
+    public GameObject coordPanel;
+    [Tooltip("坐标文本：显示 X / Y / Z 当前值和偏差")]
+    public TextMeshProUGUI coordText;
 
-    [Tooltip("步骤标签文本（TextMeshPro），对应图标下的名称")]
+    [Header("── 步骤图标（4个，顺序：光源/单缝/双缝/光屏）──")]
+    public Image[] stepIcons;
     public TextMeshProUGUI[] stepLabels;
-
-    [Tooltip("步骤未完成的颜色")]
-    public Color stepPendingColor  = new Color(0.5f, 0.5f, 0.5f, 0.8f);
-
-    [Tooltip("步骤完成后的颜色")]
-    public Color stepCompleteColor = new Color(0.2f, 1f, 0.4f, 1f);
-
-    [Tooltip("步骤出错时的颜色")]
-    public Color stepErrorColor    = new Color(1f, 0.3f, 0.3f, 1f);
+    public Color stepPendingColor = new Color(0.4f, 0.4f, 0.4f, 0.8f);
+    public Color stepCompleteColor = new Color(0.2f, 1f, 0.35f, 1f);
+    public Color stepErrorColor = new Color(1f, 0.25f, 0.25f, 1f);
 
     [Header("── 控制按钮 ──")]
-    [Tooltip("「自动对齐」按钮")]
     public Button autoAlignButton;
-
-    [Tooltip("「重置实验」按钮")]
     public Button resetButton;
-
-    [Tooltip("「检查放置」按钮")]
     public Button validateButton;
-
-    [Tooltip("「吸附辅助」开关 Toggle")]
     public Toggle snapToggle;
 
     [Header("── 验证结果面板 ──")]
-    [Tooltip("验证结果显示面板（GameObject，验证后显示）")]
     public GameObject resultPanel;
-
-    [Tooltip("验证结果标题文本")]
-    public TextMeshProUGUI resultTitleText;
-
-    [Tooltip("验证详情文本（列出各错误）")]
-    public TextMeshProUGUI resultDetailText;
-
-    [Tooltip("结果面板正确时的背景颜色")]
-    public Color resultCorrectBg = new Color(0.1f, 0.5f, 0.1f, 0.85f);
-
-    [Tooltip("结果面板错误时的背景颜色")]
-    public Color resultErrorBg   = new Color(0.5f, 0.1f, 0.1f, 0.85f);
-
-    [Tooltip("结果面板的 Image 组件（用于修改背景色）")]
+    public TextMeshProUGUI resultTitle;
+    public TextMeshProUGUI resultDetail;
     public Image resultPanelBg;
+    public Button resultCloseButton;
+    public Color resultCorrectColor = new Color(0.1f, 0.45f, 0.1f, 0.88f);
+    public Color resultErrorColor = new Color(0.45f, 0.1f, 0.1f, 0.88f);
 
     // ══════════════════════════════════════════════
-    //  私有字段
+    //  私有
     // ══════════════════════════════════════════════
 
-    private Coroutine _hintFadeCoroutine;
-    private CanvasGroup _hintCanvasGroup;   // 用于淡入淡出，需要在 hintText 父节点上
+    private Coroutine _fadeCo;
+    private CanvasGroup _hintCG;
+    private ValidationResult _lastResult;
 
-    private static readonly string[] s_StepNames =
-        { "光源", "单缝", "双缝", "光屏" };
+    private static readonly string[] s_Names = { "光源", "单缝", "双缝", "光屏" };
+
+    // 坐标面板更新节流（0.06s 刷新一次，不必每帧）
+    private float _coordUpdateTimer;
+    private const float COORD_INTERVAL = 0.06f;
 
     // ══════════════════════════════════════════════
     //  Unity 生命周期
@@ -100,216 +77,231 @@ public class ExperimentHintUI : MonoBehaviour
 
     void Awake()
     {
-        // 尝试获取 hintText 父节点上的 CanvasGroup
         if (hintText != null)
-            _hintCanvasGroup = hintText.transform.parent?.GetComponent<CanvasGroup>();
+            _hintCG = hintText.transform.parent?.GetComponent<CanvasGroup>();
 
-        // 初始化步骤标签名称
+        // 步骤标签初始化
         if (stepLabels != null)
-            for (int i = 0; i < stepLabels.Length && i < s_StepNames.Length; i++)
-                if (stepLabels[i] != null)
-                    stepLabels[i].text = s_StepNames[i];
+            for (int i = 0; i < stepLabels.Length && i < s_Names.Length; i++)
+                if (stepLabels[i] != null) stepLabels[i].text = s_Names[i];
 
-        // 隐藏结果面板
         if (resultPanel != null) resultPanel.SetActive(false);
+        if (coordPanel != null) coordPanel.SetActive(false);
+        if (dragModeText != null) dragModeText.text = "";
     }
 
     void Start()
     {
-        // 绑定按钮事件
-        if (autoAlignButton != null)
-            autoAlignButton.onClick.AddListener(OnAutoAlign);
-
-        if (resetButton != null)
-            resetButton.onClick.AddListener(OnReset);
-
-        if (validateButton != null)
-            validateButton.onClick.AddListener(OnValidate);
+        // 绑定按钮
+        autoAlignButton?.onClick.AddListener(OnClickAutoAlign);
+        resetButton?.onClick.AddListener(OnClickReset);
+        validateButton?.onClick.AddListener(OnClickValidate);
+        resultCloseButton?.onClick.AddListener(() => resultPanel?.SetActive(false));
 
         if (snapToggle != null)
         {
             snapToggle.isOn = benchManager != null && benchManager.enableSnapAssist;
-            snapToggle.onValueChanged.AddListener(OnSnapToggle);
+            snapToggle.onValueChanged.AddListener(v => benchManager?.SetSnapAssist(v));
         }
 
-        // 订阅 Manager 的提示消息事件
+        // 订阅事件
         if (benchManager != null)
         {
             benchManager.onHintMessage.AddListener(ShowHint);
-            benchManager.onExperimentCorrect.AddListener(OnExperimentCorrect);
-            benchManager.onExperimentIncorrect.AddListener(OnExperimentIncorrect);
+            benchManager.onExperimentCorrect.AddListener(OnCorrect);
+            benchManager.onExperimentIncorrect.AddListener(OnIncorrect);
         }
 
-        // 初始提示
-        ShowHint("💡 请将实验器材按顺序摆放到光具座上，拖拽器材到合适位置");
         ResetStepIcons();
+
+        // 常驻操作说明
+        if (controlHintText != null)
+            controlHintText.text =
+                "🖱 拖拽 = XZ移动  |  滚轮 = 升降\n" +
+                "Shift+拖拽 = 纯升降  |  Ctrl+拖拽 = 纯左右";
+    }
+
+    void Update()
+    {
+        UpdateCoordPanel();
+        UpdateDragModeText();
     }
 
     // ══════════════════════════════════════════════
-    //  提示文字
+    //  实时坐标面板
     // ══════════════════════════════════════════════
 
-    /// <summary>显示提示文字，带淡入效果</summary>
-    public void ShowHint(string message)
+    private void UpdateCoordPanel()
+    {
+        if (coordPanel == null || benchManager == null) return;
+
+        bool anyDragging = false;
+        ExperimentItem dragItem = null;
+        foreach (var field in new[] { benchManager.lightSource, benchManager.singleSlit,
+                                      benchManager.doubleSlit,  benchManager.screen })
+        {
+            if (field != null && field.isDragging) { anyDragging = true; dragItem = field; break; }
+        }
+
+        coordPanel.SetActive(anyDragging);
+        if (!anyDragging || dragItem == null) return;
+
+        _coordUpdateTimer -= Time.deltaTime;
+        if (_coordUpdateTimer > 0f) return;
+        _coordUpdateTimer = COORD_INTERVAL;
+
+        Vector3 p = dragItem.transform.position;
+        float dy = p.y - benchManager.opticalAxisY;
+        float dx = p.x - benchManager.opticalAxisX;
+
+        string dyStr = ColorDeviation(dy, benchManager.heightTolerance, "cm", 100f);
+        string dxStr = ColorDeviation(dx, benchManager.xAlignTolerance, "cm", 100f);
+
+        if (coordText != null)
+            coordText.text =
+                $"<b>{dragItem.displayName}</b>\n" +
+                $"X: {p.x:F3}m  偏差 {dxStr}\n" +
+                $"Y: {p.y:F3}m  偏差 {dyStr}\n" +
+                $"Z: {p.z:F3}m";
+    }
+
+    /// <summary>根据偏差大小返回带颜色标签的字符串</summary>
+    private string ColorDeviation(float dev, float tolerance, string unit, float scale)
+    {
+        float abs = Mathf.Abs(dev) * scale;
+        string val = $"{(dev >= 0 ? "+" : "")}{dev * scale:F1}{unit}";
+        string color = Mathf.Abs(dev) <= tolerance ? "#88FF88" : "#FF6666";
+        return $"<color={color}>{val}</color>";
+    }
+
+    // ══════════════════════════════════════════════
+    //  拖拽模式文字
+    // ══════════════════════════════════════════════
+
+    private void UpdateDragModeText()
+    {
+        if (dragModeText == null) return;
+
+        bool dragging = false;
+        if (benchManager != null)
+            foreach (var item in new[] { benchManager.lightSource, benchManager.singleSlit,
+                                         benchManager.doubleSlit,  benchManager.screen })
+                if (item != null && item.isDragging) { dragging = true; break; }
+
+        if (!dragging) { dragModeText.text = ""; return; }
+
+        if (Input.GetKey(KeyCode.LeftShift)) dragModeText.text = "↕ 高度调节模式 (Shift)";
+        else if (Input.GetKey(KeyCode.LeftControl)) dragModeText.text = "↔ 横向对准模式 (Ctrl)";
+        else dragModeText.text = "✥ XZ 平面移动";
+    }
+
+    // ══════════════════════════════════════════════
+    //  提示文字淡入淡出
+    // ══════════════════════════════════════════════
+
+    public void ShowHint(string msg)
     {
         if (hintText == null) return;
-        hintText.text = message;
-
-        // 打断上一个淡出协程
-        if (_hintFadeCoroutine != null)
+        hintText.text = msg;
+        if (_fadeCo != null) StopCoroutine(_fadeCo);
+        if (_hintCG != null)
         {
-            StopCoroutine(_hintFadeCoroutine);
-            _hintFadeCoroutine = null;
-        }
-
-        if (_hintCanvasGroup != null)
-        {
-            _hintCanvasGroup.alpha = 1f;
-
-            if (hintDisplayTime > 0f)
-                _hintFadeCoroutine = StartCoroutine(FadeOutHint());
+            _hintCG.alpha = 1f;
+            if (hintKeepTime > 0f) _fadeCo = StartCoroutine(FadeHint());
         }
     }
 
-    private IEnumerator FadeOutHint()
+    private IEnumerator FadeHint()
     {
-        yield return new WaitForSeconds(hintDisplayTime);
-
-        float elapsed = 0f;
-        while (elapsed < hintFadeDuration)
+        yield return new WaitForSeconds(hintKeepTime);
+        float t = 0f;
+        while (t < hintFadeTime)
         {
-            elapsed += Time.deltaTime;
-            if (_hintCanvasGroup != null)
-                _hintCanvasGroup.alpha = 1f - (elapsed / hintFadeDuration);
+            t += Time.deltaTime;
+            if (_hintCG) _hintCG.alpha = 1f - t / hintFadeTime;
             yield return null;
         }
-
-        if (_hintCanvasGroup != null)
-            _hintCanvasGroup.alpha = 0f;
-
-        _hintFadeCoroutine = null;
+        if (_hintCG) _hintCG.alpha = 0f;
+        _fadeCo = null;
     }
 
     // ══════════════════════════════════════════════
-    //  步骤进度图标更新
+    //  步骤图标
     // ══════════════════════════════════════════════
-
-    /// <summary>更新步骤图标状态（由外部或验证回调调用）</summary>
-    public void UpdateStepIcon(int index, StepStatus status)
-    {
-        if (stepIcons == null || index < 0 || index >= stepIcons.Length) return;
-        if (stepIcons[index] == null) return;
-
-        stepIcons[index].color = status switch
-        {
-            StepStatus.Complete => stepCompleteColor,
-            StepStatus.Error    => stepErrorColor,
-            _                   => stepPendingColor
-        };
-    }
-
-    /// <summary>全部重置为待完成状态</summary>
-    public void ResetStepIcons()
-    {
-        if (stepIcons == null) return;
-        for (int i = 0; i < stepIcons.Length; i++)
-            UpdateStepIcon(i, StepStatus.Pending);
-    }
 
     public enum StepStatus { Pending, Complete, Error }
 
-    // ══════════════════════════════════════════════
-    //  验证结果面板
-    // ══════════════════════════════════════════════
-
-    private void OnExperimentCorrect()
+    public void SetStepStatus(int i, StepStatus s)
     {
-        ShowResultPanel(true, "✅ 放置正确！", "实验器材顺序和位置均正确\n请观察光屏上的双缝干涉条纹");
-
-        // 步骤全部标绿
-        for (int i = 0; i < 4; i++)
-            UpdateStepIcon(i, StepStatus.Complete);
+        if (stepIcons == null || i < 0 || i >= stepIcons.Length || stepIcons[i] == null) return;
+        stepIcons[i].color = s switch
+        {
+            StepStatus.Complete => stepCompleteColor,
+            StepStatus.Error => stepErrorColor,
+            _ => stepPendingColor
+        };
     }
 
-    private void OnExperimentIncorrect()
+    public void ResetStepIcons()
     {
-        // 结果面板由 ShowResultPanel 统一调用
-        // 此处仅做步骤图标更新（需要从 Manager 获取细节，简化处理）
+        if (stepIcons == null) return;
+        for (int i = 0; i < stepIcons.Length; i++) SetStepStatus(i, StepStatus.Pending);
     }
 
-    /// <summary>显示或刷新验证结果面板</summary>
-    public void ShowResultPanel(bool correct, string title, string detail)
-    {
-        if (resultPanel == null) return;
+    // ══════════════════════════════════════════════
+    //  结果面板
+    // ══════════════════════════════════════════════
 
+    private void ShowResultPanel(ValidationResult r)
+    {
+        if (resultPanel == null || r == null) return;
         resultPanel.SetActive(true);
 
-        if (resultTitleText != null)  resultTitleText.text = title;
-        if (resultDetailText != null) resultDetailText.text = detail;
+        bool ok = r.isCorrect;
+        if (resultPanelBg) resultPanelBg.color = ok ? resultCorrectColor : resultErrorColor;
+        if (resultTitle) resultTitle.text = ok ? "✅ 放置正确！" : "⚠ 放置有误";
+        if (resultDetail)
+            resultDetail.text = ok
+                ? "所有器材已对准光轴（高度 + 横向），顺序正确。\n开始实验！"
+                : string.Join("\n", r.errors);
 
-        if (resultPanelBg != null)
-            resultPanelBg.color = correct ? resultCorrectBg : resultErrorBg;
-    }
-
-    public void HideResultPanel()
-    {
-        if (resultPanel != null) resultPanel.SetActive(false);
+        // 步骤图标
+        ExperimentItem[] items = { benchManager?.lightSource, benchManager?.singleSlit,
+                                   benchManager?.doubleSlit,  benchManager?.screen };
+        for (int i = 0; i < 4; i++)
+            SetStepStatus(i, ok ? StepStatus.Complete
+                : (r.IsItemInError(items[i]?.displayName ?? "") ? StepStatus.Error : StepStatus.Complete));
     }
 
     // ══════════════════════════════════════════════
-    //  按钮回调
+    //  事件回调
     // ══════════════════════════════════════════════
 
-    private void OnAutoAlign()
-    {
-        if (benchManager == null) return;
-        HideResultPanel();
-        benchManager.AutoAlignAll();
-    }
+    private void OnCorrect() { for (int i = 0; i < 4; i++) SetStepStatus(i, StepStatus.Complete); }
+    private void OnIncorrect() { if (_lastResult != null) ShowResultPanel(_lastResult); }
 
-    private void OnReset()
+    // ══════════════════════════════════════════════
+    //  按钮
+    // ══════════════════════════════════════════════
+
+    private void OnClickAutoAlign()
     {
-        if (benchManager == null) return;
-        HideResultPanel();
+        resultPanel?.SetActive(false);
         ResetStepIcons();
-        benchManager.ResetAll();
+        benchManager?.AutoAlignAll();
     }
 
-    private void OnValidate()
+    private void OnClickReset()
+    {
+        resultPanel?.SetActive(false);
+        ResetStepIcons();
+        benchManager?.ResetAll();
+    }
+
+    private void OnClickValidate()
     {
         if (benchManager == null) return;
-
-        ValidationResult result = benchManager.ValidateSetup();
-
-        if (result.isCorrect)
-        {
-            ShowResultPanel(true, "✅ 放置正确！", "所有器材已正确放置。\n可以开始实验！");
-        }
-        else
-        {
-            string detail = string.Join("\n", result.errors);
-            ShowResultPanel(false, "⚠ 放置有误", detail);
-
-            // 更新步骤图标
-            ResetStepIcons();
-            string[] names = { lightSourceName, singleSlitName, doubleSlitName, screenName };
-            for (int i = 0; i < names.Length; i++)
-                UpdateStepIcon(i,
-                    result.IsItemInError(names[i]) ? StepStatus.Error : StepStatus.Complete);
-        }
+        _lastResult = benchManager.ValidateSetup();
+        ShowResultPanel(_lastResult);
     }
-
-    private void OnSnapToggle(bool value)
-    {
-        benchManager?.SetSnapAssist(value);
-    }
-
-    // ══════════════════════════════════════════════
-    //  器材名称缓存（用于步骤图标匹配）
-    // ══════════════════════════════════════════════
-
-    private string lightSourceName => benchManager?.lightSource?.ChineseName() ?? "光源";
-    private string singleSlitName  => benchManager?.singleSlit?.ChineseName()  ?? "单缝";
-    private string doubleSlitName  => benchManager?.doubleSlit?.ChineseName()  ?? "双缝";
-    private string screenName      => benchManager?.screen?.ChineseName()      ?? "光屏";
 }
