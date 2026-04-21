@@ -35,7 +35,7 @@ public class GraphRenderer : MonoBehaviour
 
     //图像资源
     public Sprite uiImage;
-    private void Awake()
+    private void Start()
     {
         // 初始化图表
         InitializeGraphs();
@@ -78,8 +78,8 @@ public class GraphRenderer : MonoBehaviour
         if (graphArea == null) return;
 
         // 轴颜色与粗细
-        Color axisColor = new Color(0.75f, 0.75f, 0.75f, 1f);
-        float axisThickness = 2f;
+        Color axisColor = new Color(1f, 1f, 1f, 1f);
+        float axisThickness = 10f;
 
         // 垂直轴（左）
         GameObject vAxis = CreateUIImage("Axis_V", graphArea, axisColor);
@@ -141,13 +141,13 @@ public class GraphRenderer : MonoBehaviour
     // Helper: 创建 TextMeshProUGUI 标签
     private GameObject CreateUIText(string name, RectTransform parent, string text)
     {
-        var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshPro));
+        var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
         go.transform.SetParent(parent, false);
-        var txt = go.GetComponent<TextMeshPro>();
+        var txt = go.GetComponent<TextMeshProUGUI>();
         txt.text = text;
-        txt.fontSize = 18;
-        txt.alignment = TextAlignmentOptions.Center;
-        txt.color = Color.white;
+        txt.fontSize = 24;
+        txt.alignment = TextAlignmentOptions.BottomRight;
+        txt.color = Color.red;
         txt.raycastTarget = false;
         txt.font = font; // 使用指定字体资源
         return go;
@@ -333,6 +333,7 @@ public class GraphRenderer : MonoBehaviour
         }
     }
     
+    //生成数据点标记
     private GameObject CreateDataPointMarker(RectTransform parent, Vector3 localPos, Color color, Sprite sprite)
     {
         GameObject go = new GameObject("DataPoint", typeof(RectTransform), typeof(Image));
@@ -347,6 +348,8 @@ public class GraphRenderer : MonoBehaviour
         return go;
     }
     
+
+    //清除数据点标记
     private void ClearDataPointMarkers()
     {
         foreach (var m in dataPointMarkers) if (m != null) Destroy(m);
@@ -357,8 +360,8 @@ public class GraphRenderer : MonoBehaviour
     public void ResetGraphs()
     {
         // 清除轴与标记
-        foreach (var a in axisObjects) if (a != null) Destroy(a);
-        axisObjects.Clear();
+        //foreach (var a in axisObjects) if (a != null) Destroy(a);
+        //axisObjects.Clear();
         ClearDataPointMarkers();
         
         // 重置线条渲染器

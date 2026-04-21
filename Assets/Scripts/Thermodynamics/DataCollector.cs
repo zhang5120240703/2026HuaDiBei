@@ -141,6 +141,7 @@ public class DataCollector : MonoBehaviour
         maxErrorPercentage = 0;
     }
 
+
     // 检查是否需要更多数据
     public bool NeedMoreData()
     {

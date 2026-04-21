@@ -269,7 +269,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     public void SetCurrentProcess(IdealGasSimulation.ProcessType process)
     {
         currentProcess = process;
-        SetPistonDragged(process);
+        SetPistonDragged(process); 
 
     }
 
