@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -44,7 +45,8 @@ public class UIManager : MonoBehaviour
     // UI2 点开始实验：跳去对应场景
     public void StartExperiment()
     {
-        SceneManager.LoadScene(selectedScene);
+        StartCoroutine(LoadToScene());
+        //SceneManager.LoadScene(selectedScene);
     }
 
     // 从实验场景回来 → 显示总结 UI4
@@ -71,4 +73,10 @@ public class UIManager : MonoBehaviour
     {
         ShowPage(currentPage - 1);
     }
+
+    public IEnumerator LoadToScene()
+    {
+        yield return SceneManager.LoadSceneAsync(selectedScene);
+    }
+
 }
