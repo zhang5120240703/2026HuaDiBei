@@ -326,6 +326,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cylinderController: {fileID: 5000002}
+  experimentStepController: {fileID: 7000010}
 --- !u!114 &7000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -502,7 +503,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -830.2147, y: -681.80005}
+  m_AnchoredPosition: {x: -834, y: -623}
   m_SizeDelta: {x: -1720.1294, y: -1363.6}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &245142445

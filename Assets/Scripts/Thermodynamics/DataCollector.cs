@@ -1,26 +1,32 @@
-﻿using UnityEngine;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 public class DataCollector : MonoBehaviour
 {
     // 引用
     public CylinderController cylinderController;
-    
+    public ExperimentStepController experimentStepController;
     // 数据点结构
-    public struct DataPoint
+    public class DataPoint
     {
         public float volume; // 体积 (L)
         public float pressure; // 压力 (kPa)
         public float temperature; // 温度 (K)
         public float pvProduct; // PV乘积
         public float inverseVolume; // 1/V
+
     }
     
     // 数据记录
     private List<DataPoint> dataPoints = new List<DataPoint>();
     private float lastVolumeChangeTime;
     private const float stabilizationTime = 2.0f; // 稳定时间
-    
+
+    // 自动采集间隔
+    private const float autoCollectInterval = 5.0f;
+    private float autoCollectTimer = 0f;
+
     // 分析结果
     private float averagePVProduct;
     private float pvStandardDeviation;
@@ -38,13 +44,16 @@ public class DataCollector : MonoBehaviour
     
     private void Update()
     {
-        // 检查数据稳定状态
-        //if (cylinderController.IsVolumeStable() &&
-        //    Time.time - lastVolumeChangeTime > stabilizationTime &&
-        //    dataPoints.Count < 5)
-        //{
-        //    CollectDataPoint();
-        //}
+        // 每隔 autoCollectInterval 秒自动采集一次数据点
+        autoCollectTimer += Time.deltaTime;
+        //检查数据稳定状态
+        if (cylinderController.IsVolumeStable() &&
+            Time.time - lastVolumeChangeTime > stabilizationTime &&
+            dataPoints.Count < 5&& autoCollectTimer >= autoCollectInterval &&
+            experimentStepController.GetCurrentStage()==ExperimentStepController.ExperimentStage.DataCollection)
+        {
+            CollectDataPoint();
+        }
 
 
     }
@@ -70,15 +79,27 @@ public class DataCollector : MonoBehaviour
             pvProduct = pressure * volume,
             inverseVolume = 1.0f / Mathf.Max(volume, 1e-6f)
         };
+        // 手动检查是否存在相同数据点
+        bool exists = dataPoints.Any(p =>
+            Mathf.Approximately(p.volume, point.volume) &&
+            Mathf.Approximately(p.pressure, point.pressure) &&
+            Mathf.Approximately(p.temperature, point.temperature));
+
+        if (exists)
+        {
+            return null;
+        }
 
         return point;
     }
      
-    //采集数据
+    //自动采集数据
     public void CollectDataPoint()
     {
+
         DataPoint point=CreatDataPoint();
         
+        if(point ==null) return;
         // 添加到数据列表
         dataPoints.Add(point);
         
@@ -86,13 +107,30 @@ public class DataCollector : MonoBehaviour
         OnDataCollected?.Invoke();
         
         // 检查是否需要分析
-        if (dataPoints.Count >= 3)
+        if (dataPoints.Count >= 50)
         {
             AnalyzeData();
         }
     }
 
-    
+    //手动采集数据
+    public void AddDataPoint()
+    {
+        DataPoint point = CreatDataPoint();
+        if (point == null) return;
+
+        // 添加到数据列表
+        dataPoints.Add(point);
+
+        // 触发事件
+        OnDataCollected?.Invoke();
+
+        // 检查是否需要分析
+        if (dataPoints.Count >= 3)
+        {
+            AnalyzeData();
+        }
+    }
     private void AnalyzeData()
     {
         if (dataPoints.Count == 0) return;

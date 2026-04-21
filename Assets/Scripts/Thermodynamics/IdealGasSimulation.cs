@@ -38,7 +38,7 @@ public class IdealGasSimulation : MonoBehaviour
     private const float maxTemperature = 500.0f;
     
     // 压力范围限制
-    public const float minPressure = 1.0f;
+    public const float minPressure = 10.0f;
     public const float maxPressure = 500.0f;
     
     // 事件
@@ -61,15 +61,17 @@ public class IdealGasSimulation : MonoBehaviour
     private void Start()
     {
         Initialization();
+        SetProcess(ProcessType.Null);
     }
-    
+
     public void Initialization()
     {
         // 初始设置
         volume = 1.0f;
         temperature = 300.0f;
         UpdatePressure();
-        SetProcess(ProcessType.Null);
+        UpdateVolume();
+        UpdateTemperature();
     }
 
     public void SetProcess(ProcessType process)
@@ -180,14 +182,16 @@ public class IdealGasSimulation : MonoBehaviour
     {
         // PV = nRT
         // P (kPa) = (nRT) / V (L) * 1000 (Pa/kPa) / 1000 (L/m³) = nRT / V
-        pressure = (moles * R * temperature) / volume;
+        float newPressure = (moles * R * temperature) / volume;
+        pressure = newPressure + Random.Range(-newPressure*0.025f, newPressure * 0.025f);
         pressure = Mathf.Clamp(pressure, minPressure, maxPressure);
     }
     
     private void UpdateVolume()
     {
         // V = nRT / P
-        volume = (moles * R * temperature) / pressure;
+        float newVolume = (moles * R * temperature) / pressure;
+        volume = newVolume+ Random.Range(-newVolume*0.02f, newVolume * 0.02f);
         // 限制体积范围
         volume = Mathf.Clamp(volume, minVolume, maxVolume);
     }
@@ -195,7 +199,8 @@ public class IdealGasSimulation : MonoBehaviour
     private void UpdateTemperature()
     {
         // T = PV / (nR)
-        temperature = (pressure * volume) / (moles * R);
+        float newTemperature = (pressure * volume) / (moles * R);
+        temperature = newTemperature + Random.Range(-newTemperature*0.02f, newTemperature * 0.02f);
         // 限制温度范围
         temperature = Mathf.Clamp(temperature, minTemperature, maxTemperature);
     }
@@ -221,6 +226,7 @@ public class IdealGasSimulation : MonoBehaviour
 
     #endregion
 
+    #region 误差分析
     // 计算理论值（用于误差分析）
     public float CalculateTheoreticalPressure(float targetVolume, float targetTemperature)
     {
@@ -243,4 +249,5 @@ public class IdealGasSimulation : MonoBehaviour
         if (theoretical == 0) return 0;
         return Mathf.Abs((actual - theoretical) / theoretical) * 100f;
     }
+    #endregion
 }

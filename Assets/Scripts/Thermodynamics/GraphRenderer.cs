@@ -1,13 +1,13 @@
-﻿using UnityEngine;
-using UnityEngine.UI;
+﻿using System.Collections.Generic;
 using TMPro;
-using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using static UnityEditor.PlayerSettings;
 
 public class GraphRenderer : MonoBehaviour
 {
     // 引用
     public DataCollector dataCollector;
-    public IdealGasSimulation gasSimulation;
     
     // 图表区域
     public RectTransform pvGraphArea;
@@ -35,6 +35,7 @@ public class GraphRenderer : MonoBehaviour
 
     //图像资源
     public Sprite uiImage;
+
     private void Start()
     {
         // 初始化图表
@@ -56,22 +57,24 @@ public class GraphRenderer : MonoBehaviour
             dataCollector.OnAnalysisCompleted -= UpdateGraphs;
         }
     }
-    
+
+    //初始化图表组件和坐标轴
     private void InitializeGraphs()
     {
-        // 创建 PV 关系图的 LineRenderer
-        pvLineRenderer = CreateLineRenderer(pvGraphArea, Color.blue, lineWidth);
-        pvFitLineRenderer = CreateLineRenderer(pvGraphArea, Color.cyan, lineWidth * 0.6f);
-        
+        // 创建 P-V 关系图的 LineRenderer
+        pvLineRenderer = CreateLineRenderer(pvGraphArea, Color.red, lineWidth);
+        pvFitLineRenderer = CreateLineRenderer(pvGraphArea, Color.red, lineWidth * 0.6f);
+
         // 创建 P-1/V 关系图的 LineRenderer
         pInverseVLineRenderer = CreateLineRenderer(pInverseVGraphArea, Color.red, lineWidth);
-        pInverseVFitLineRenderer = CreateLineRenderer(pInverseVGraphArea, Color.black, lineWidth * 0.6f);
+        pInverseVFitLineRenderer = CreateLineRenderer(pInverseVGraphArea, Color.red, lineWidth * 0.6f);
         
         // 绘制坐标轴（UI）
         DrawAxes(pvGraphArea, "体积 (L)", "压力 (kPa)");
         DrawAxes(pInverseVGraphArea, "1/体积 (1/L)", "压力 (kPa)");
     }
 
+    #region 绘制坐标轴
     // DrawAxis: 在指定 panel 上绘制简单坐标轴和标签（左/下轴）
     private void DrawAxes(RectTransform graphArea, string xLabel, string yLabel)
     {
@@ -128,7 +131,7 @@ public class GraphRenderer : MonoBehaviour
         axisObjects.Add(yLabelGO);
     }
 
-    // Helper: 创建 Image 作为轴线或其他 UI 背景
+    // 创建 Image 作为轴线或其他 UI 背景
     private GameObject CreateUIImage(string name, RectTransform parent, Color color)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Image));
@@ -138,7 +141,7 @@ public class GraphRenderer : MonoBehaviour
         return go;
     }
 
-    // Helper: 创建 TextMeshProUGUI 标签
+    //创建 坐标轴文本
     private GameObject CreateUIText(string name, RectTransform parent, string text)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -152,29 +155,41 @@ public class GraphRenderer : MonoBehaviour
         txt.font = font; // 使用指定字体资源
         return go;
     }
-    
+    #endregion
+
+    //创建 LineRenderer 用于绘制数据线条
     private LineRenderer CreateLineRenderer(RectTransform parent, Color color, float width)
     {
         GameObject lineObject = new GameObject("LineRenderer");
         lineObject.transform.SetParent(parent, false); // 保持本地变换
-        lineObject.transform.localPosition = Vector3.zero;
-        lineObject.transform.localScale = Vector3.one;
+        lineObject.transform.localPosition = Vector3.zero;//本地位置归零
+        lineObject.transform.localScale = Vector3.one;//本地缩放归一
 
         LineRenderer lineRenderer = lineObject.AddComponent<LineRenderer>();
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));//使用Sprites/Default着色器
+
+
+        //保持整条线颜色一致，避免渐变
         lineRenderer.startColor = color;
         lineRenderer.endColor = color;
+        //保持线条宽度一致
         lineRenderer.startWidth = width;
         lineRenderer.endWidth = width;
+
+        
         lineRenderer.positionCount = 0;
 
-        // 关键：在 UI 容器内使用本地坐标
+        // 在 UI 容器内使用本地坐标
         lineRenderer.useWorldSpace = false;
         lineRenderer.alignment = LineAlignment.TransformZ;
 
+        lineRenderer.numCapVertices = 4;
+        lineRenderer.numCornerVertices = 4;
         return lineRenderer;
     }
     
+
+
     // 把归一化 (0..1) 转为父 RectTransform 的本地像素坐标（左下为 rect.xMin,yMin）
     private Vector3 ToLocalPosition(RectTransform area, float normX, float normY)
     {
@@ -185,35 +200,38 @@ public class GraphRenderer : MonoBehaviour
         return new Vector3(x, y, 0f);
     }
     
+
+
     // 用父 RectTransform 像素坐标返回 PV 点位置
     private Vector3 GetPVGraphPosition(DataCollector.DataPoint point)
     {
         // 动态范围：优先使用 gasSimulation 范围，若需要可改为基于 dataCollector 数据动态计算 min/max
-        float minV = gasSimulation.GetMinVolume();
-        float maxV = gasSimulation.GetMaxVolume();
-        float minP = 0f; // 你可以替换为更合适的下界，例如 gasSimulation.GetMinPressure()
-        float maxP = gasSimulation.GetMaxPressure();
+        float minV = IdealGasSimulation.Instance.GetMinVolume();
+        float maxV = IdealGasSimulation.Instance.GetMaxVolume();
+        float minP = IdealGasSimulation.Instance.GetMinPressure(); 
+        float maxP = IdealGasSimulation.Instance.GetMaxPressure();
 
         float normX = Mathf.InverseLerp(minV, maxV, point.volume); // 0..1
         float normY = Mathf.InverseLerp(minP, maxP, point.pressure); // 0..1
-
         return ToLocalPosition(pvGraphArea, normX, normY);
     }
+
 
     private Vector3 GetPInverseVGraphPosition(DataCollector.DataPoint point)
     {
         // 1/V 范围，用数据或模拟范围决定
-        float minInvV = 1.0f / Mathf.Max(gasSimulation.GetMaxVolume(), 1e-6f);
-        float maxInvV = 1.0f / Mathf.Max(gasSimulation.GetMinVolume(), 1e-6f);
+        float minInvV = 1.0f / Mathf.Max(IdealGasSimulation.Instance.GetMaxVolume(), 1e-6f);//防止除以0
+        float maxInvV = 1.0f / Mathf.Max(IdealGasSimulation.Instance.GetMinVolume(), 1e-6f);
         float minP = 0f;
-        float maxP = gasSimulation.GetMaxPressure();
+        float maxP = IdealGasSimulation.Instance.GetMaxPressure();
 
         float normX = Mathf.InverseLerp(minInvV, maxInvV, point.inverseVolume);
         float normY = Mathf.InverseLerp(minP, maxP, point.pressure);
 
         return ToLocalPosition(pInverseVGraphArea, normX, normY);
     }
-    
+
+    #region 更新图表
     public void UpdateGraphs()
     {
         var dataPoints = dataCollector.GetDataPoints();
@@ -242,12 +260,12 @@ public class GraphRenderer : MonoBehaviour
         }
         
         // 绘制拟合曲线（等温过程）
-        if (gasSimulation != null && gasSimulation.GetCurrentProcess() == IdealGasSimulation.ProcessType.Isothermal && dataPoints.Count >= 2)
+        if (IdealGasSimulation.Instance != null && IdealGasSimulation.Instance.GetCurrentProcess() == IdealGasSimulation.ProcessType.Isothermal && dataPoints.Count >= 3)
         {
             DrawPVFitCurve();
         }
     }
-    
+
     private void UpdatePInverseVGraph(List<DataCollector.DataPoint> dataPoints)
     {
         if (pInverseVLineRenderer == null) return;
@@ -261,24 +279,27 @@ public class GraphRenderer : MonoBehaviour
         }
         
         // 绘制线性拟合直线（等温过程）
-        if (gasSimulation != null && gasSimulation.GetCurrentProcess() == IdealGasSimulation.ProcessType.Isothermal && dataPoints.Count >= 2)
+        if (IdealGasSimulation.Instance != null && IdealGasSimulation.Instance.GetCurrentProcess() == IdealGasSimulation.ProcessType.Isothermal && dataPoints.Count >= 3)
         {
             DrawPInverseVFitLine(dataPoints);
         }
     }
-    
+    #endregion
+
+
+
     private void DrawPVFitCurve()
     {
-        float temperature = gasSimulation.GetTemperature();
-        float moles = gasSimulation.moles;
+        float temperature = IdealGasSimulation.Instance.GetTemperature();
+        float moles = IdealGasSimulation.Instance.moles;
         float R = IdealGasSimulation.R;
         
         int pointCount = 50;
         if (pvFitLineRenderer == null) return;
         pvFitLineRenderer.positionCount = pointCount;
         
-        float minVolume = gasSimulation.GetMinVolume();
-        float maxVolume = gasSimulation.GetMaxVolume();
+        float minVolume = IdealGasSimulation.Instance.GetMinVolume();
+        float maxVolume = IdealGasSimulation.Instance.GetMaxVolume();
         
         for (int i = 0; i < pointCount; i++)
         {
@@ -305,18 +326,20 @@ public class GraphRenderer : MonoBehaviour
         pInverseVFitLineRenderer.positionCount = 2;
         DataCollector.DataPoint startPoint = new DataCollector.DataPoint
         {
-            inverseVolume = 1.0f / gasSimulation.GetMaxVolume(),
-            pressure = k * (1.0f / gasSimulation.GetMaxVolume())
+            inverseVolume = 1.0f / IdealGasSimulation.Instance.GetMaxVolume(),
+            pressure = k * (1.0f / IdealGasSimulation.Instance.GetMaxVolume())
         };
         DataCollector.DataPoint endPoint = new DataCollector.DataPoint
         {
-            inverseVolume = 1.0f / gasSimulation.GetMinVolume(),
-            pressure = k * (1.0f / gasSimulation.GetMinVolume())
+            inverseVolume = 1.0f / IdealGasSimulation.Instance.GetMinVolume(),
+            pressure = k * (1.0f / IdealGasSimulation.Instance.GetMinVolume())
         };
         pInverseVFitLineRenderer.SetPosition(0, GetPInverseVGraphPosition(startPoint));
         pInverseVFitLineRenderer.SetPosition(1, GetPInverseVGraphPosition(endPoint));
     }
-    
+
+    #region 显示数据点
+    //绘制数据点标记（使用 UI Image）
     private void DrawDataPointMarkers(List<DataCollector.DataPoint> dataPoints)
     {
         // 清除旧标记
@@ -347,7 +370,8 @@ public class GraphRenderer : MonoBehaviour
         img.raycastTarget = false;
         return go;
     }
-    
+    #endregion
+
 
     //清除数据点标记
     private void ClearDataPointMarkers()

@@ -60,8 +60,6 @@ public class UIPanel : MonoBehaviour
         //初始隐藏输入面板
         inputPanel.alpha = 0;
 
-
-
         // 初始更新
         UpdateStatusDisplay(IdealGasSimulation.Instance.GetPressure(), IdealGasSimulation.Instance.GetVolume(), IdealGasSimulation.Instance.GetTemperature());
         UpdateStatusText();

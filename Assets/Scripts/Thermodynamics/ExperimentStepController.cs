@@ -131,8 +131,15 @@ public class ExperimentStepController : MonoBehaviour
     // 重置实验(按钮调用)
     public void ResetExperiment()
     {
+        if (!isStart)
+        {
+            uiPanel.ShowError("请先开始实验过!");
+            return;
+        }
         SetStage(ExperimentStage.Preparation);
         IdealGasSimulation.Instance.Initialization();
+        cylinderController.SetPistonPosition(IdealGasSimulation.Instance.GetVolume());
+        SetProcess(3);
         StopDataCollectionMode();
         dataCollector.ResetData();
         uiManager.ResetUI();
@@ -150,7 +157,7 @@ public class ExperimentStepController : MonoBehaviour
             return;
         }
 
-        dataCollector.CollectDataPoint();
+        dataCollector.AddDataPoint();
         confirmCount++;
         // 更新 UI 提示
         if (uiPanel != null && uiPanel.statusText != null)
@@ -197,9 +204,6 @@ public class ExperimentStepController : MonoBehaviour
     // 停止数据采集模式
     private void StopDataCollectionMode()
     {
-        // 禁用确认按钮
-        if (uiPanel != null && uiPanel.confirmButton != null)
-            uiPanel.confirmButton.interactable = false;
 
         // 重置计数与提示
         confirmCount = 0;
