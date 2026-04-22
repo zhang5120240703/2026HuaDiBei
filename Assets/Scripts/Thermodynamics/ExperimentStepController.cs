@@ -22,9 +22,6 @@ public class ExperimentStepController : MonoBehaviour
         DataAnalysis, // 数据分析 
         Conclusion // 结论总结
     }
-    // 手动确认计数（数据采集时用户需要确认三次）
-    private const int requiredConfirms = 3;
-    private int confirmCount = 0;
 
     private ExperimentStage currentStage = ExperimentStage.Preparation;// 当前实验阶段
     
@@ -95,7 +92,7 @@ public class ExperimentStepController : MonoBehaviour
                 
             case ExperimentStage.DataCollection:
                 // 数据采集阶段：检查是否采集了足够的数据点
-                if (dataCollector.GetDataPointCount() >= 3)
+                if (dataCollector.GetDataPointCount() >= 10&&isConfirm)
                 {
                     SetStage(ExperimentStage.DataAnalysis);
                 }
@@ -140,7 +137,6 @@ public class ExperimentStepController : MonoBehaviour
         IdealGasSimulation.Instance.Initialization();
         cylinderController.SetPistonPosition(IdealGasSimulation.Instance.GetVolume());
         SetProcess(3);
-        StopDataCollectionMode();
         dataCollector.ResetData();
         uiManager.ResetUI();
         isReset = true;
@@ -153,25 +149,12 @@ public class ExperimentStepController : MonoBehaviour
     {
         if (currentStage != ExperimentStage.DataCollection)
         {
-            uiPanel.ShowError("当前不在数据采集阶段，无法确认参数。");
             return;
         }
+        isConfirm = true;
 
-        dataCollector.AddDataPoint();
-        confirmCount++;
-        // 更新 UI 提示
-        if (uiPanel != null && uiPanel.statusText != null)
-            uiPanel.statusText.text = $"已确认 {confirmCount}/{requiredConfirms} 次参数。";
-
-        // 当达到所需确认次数时，停止手动模式并进入下一阶段（数据分析）
-        if (confirmCount >= requiredConfirms)
-        {
-            // 停止手动采集
-            StopDataCollectionMode();
-
-        }
     }
-    // 切换实验过程
+    // 切换实验过程(按钮调用)
     public void SetProcess(int process)
     {
         IdealGasSimulation.Instance.SetProcess((IdealGasSimulation.ProcessType)process);
@@ -201,33 +184,5 @@ public class ExperimentStepController : MonoBehaviour
         }
     }
 
-    // 停止数据采集模式
-    private void StopDataCollectionMode()
-    {
 
-        // 重置计数与提示
-        confirmCount = 0;
-        if (uiPanel != null && uiPanel.statusText != null)
-            uiPanel.statusText.text = "数据采集已停止";
-    }
-
-    // 获取当前阶段的操作指引
-    //public string GetStageInstruction()
-    //{  
-    //    switch (currentStage)
-    //    {
-    //        case ExperimentStage.Preparation:
-    //            return "欢迎来到理想气体状态方程实验！请选择实验过程。";
-    //        case ExperimentStage.ParameterSetup:
-    //            return "请设置实验温度，然后点击开始按钮。";
-    //        case ExperimentStage.DataCollection:
-    //            return "请移动活塞改变气体体积，系统会自动记录稳定的数据点。";
-    //        case ExperimentStage.DataAnalysis:
-    //            return "系统正在分析数据，请稍候...";
-    //        case ExperimentStage.Conclusion:
-    //            return "实验完成！请查看分析结果。";
-    //        default:
-    //            return "";
-    //    }
-    //}
 }

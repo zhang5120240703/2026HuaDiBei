@@ -101,24 +101,19 @@ public class UIPanel : MonoBehaviour
         // 使用Slider值来设置温度
         IdealGasSimulation.Instance.SetTemperature(value);
 
-        // 更新温度显示
-        //temperatureText.text = "温度: " + value.ToString("F2") + " K";
     }
     public void OnPressureSliderChanged(float value)
     {
         // 使用Slider值来设置压强
         IdealGasSimulation.Instance.SetPressure(value);
 
-        // 更新压强显示
-        //pressureText.text = "压强: " + value.ToString("F2") + " kPa";
     }
 
     public void OnVolumeSliderChanged(float value)
     {
         // 使用Slider值来设置体积
         IdealGasSimulation.Instance.SetVolume(value);
-        // 更新体积显示
-        //volumeText.text = "体积: " + value.ToString("F2") + " L";
+
     }
     #endregion
 
@@ -192,13 +187,13 @@ public class UIPanel : MonoBehaviour
                 statusText.text = "操作指引: 点击开始按钮开始实验";
                 break;
             case 3:
-                statusText.text = "操作指引: 移动活塞或者调整滑动条，点击确认按钮采集数据";
+                statusText.text = "操作指引: 移动活塞或者调整滑动条，系统将自动采集数据";
                 break;
             case 4:
-                statusText.text = "操作指引: 查看数据分析结果";
+                statusText.text = "操作指引: 数据收集完成，请点击确认按钮查看图像分析结果";
                 break;
             case 5:
-                statusText.text = "操作指引: 实验完成，可返回主菜单";
+                statusText.text = "操作指引: 实验完成，可重置实验";
                 break;
         }
     }
@@ -213,6 +208,10 @@ public class UIPanel : MonoBehaviour
     {
         int dataCount = dataCollector.GetDataPointCount();
         statusText.text = "已采集 " + dataCount + " 个数据点，继续调整体积";
+        if(dataCount==dataCollector.GetRequiredPointsForLines())
+        {
+            statusText.text += "数据点收集完毕，点击确认按钮查看实验图像分析结果";
+        }
     }
     
     

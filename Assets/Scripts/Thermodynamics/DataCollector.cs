@@ -21,12 +21,16 @@ public class DataCollector : MonoBehaviour
     // 数据记录
     private List<DataPoint> dataPoints = new List<DataPoint>();
     private float lastVolumeChangeTime;
-    private const float stabilizationTime = 2.0f; // 稳定时间
+    private const float stabilizationTime = 0.5f; // 稳定时间
 
     // 自动采集间隔
-    private const float autoCollectInterval = 5.0f;
+    private const float autoCollectInterval = 1.0f;
     private float autoCollectTimer = 0f;
-
+    // 控制：达到多少个数据点后开始绘制连线（Inspector 可调）
+    public int requiredPointsForLines = 10;
+    // 最小采样间距（归一化后）。控制相邻数据点不要过近，取值范围 ~0.02-0.2 之间常用
+    [Tooltip("归一化的最小距离阈值（0..1），用于避免采集过于接近的数据点）")]
+    public float minNormalizedSpacing = 0.08f;
     // 分析结果
     private float averagePVProduct;
     private float pvStandardDeviation;
@@ -49,10 +53,11 @@ public class DataCollector : MonoBehaviour
         //检查数据稳定状态
         if (cylinderController.IsVolumeStable() &&
             Time.time - lastVolumeChangeTime > stabilizationTime &&
-            dataPoints.Count < 5&& autoCollectTimer >= autoCollectInterval &&
+            dataPoints.Count < requiredPointsForLines && autoCollectTimer >= autoCollectInterval &&
             experimentStepController.GetCurrentStage()==ExperimentStepController.ExperimentStage.DataCollection)
         {
             CollectDataPoint();
+            autoCollectTimer = 0f; // 重置自动采集计时器
         }
 
 
@@ -89,10 +94,45 @@ public class DataCollector : MonoBehaviour
         {
             return null;
         }
+        // 如果与已有点过于接近（归一化空间），则忽略以保证点分散
+        if (IsTooClose(point))
+        {
+            return null;
+        }
+
 
         return point;
     }
-     
+
+
+    // 判断 candidate 是否与已有点太接近（归一化体积/压力空间的欧氏距离）
+    private bool IsTooClose(DataPoint candidate)
+    {
+        if (dataPoints == null || dataPoints.Count == 0) return false;
+
+        var sim = IdealGasSimulation.Instance;
+        if (sim == null) return false;
+
+        float minV = sim.GetMinVolume();
+        float maxV = sim.GetMaxVolume();
+        float minP = sim.GetMinPressure();
+        float maxP = sim.GetMaxPressure();
+
+        // 防止除以 0
+        float vRange = Mathf.Max(1e-6f, maxV - minV);
+        float pRange = Mathf.Max(1e-6f, maxP - minP);
+
+        foreach (var p in dataPoints)
+        {
+            float nx = Mathf.Abs(candidate.volume - p.volume) / vRange;
+            float ny = Mathf.Abs(candidate.pressure - p.pressure) / pRange;
+            float dist = Mathf.Sqrt(nx * nx + ny * ny);
+            if (dist < minNormalizedSpacing)
+                return true;
+        }
+
+        return false;
+    }
     //自动采集数据
     public void CollectDataPoint()
     {
@@ -107,30 +147,12 @@ public class DataCollector : MonoBehaviour
         OnDataCollected?.Invoke();
         
         // 检查是否需要分析
-        if (dataPoints.Count >= 50)
+        if (dataPoints.Count >= 20)
         {
             AnalyzeData();
         }
     }
 
-    //手动采集数据
-    public void AddDataPoint()
-    {
-        DataPoint point = CreatDataPoint();
-        if (point == null) return;
-
-        // 添加到数据列表
-        dataPoints.Add(point);
-
-        // 触发事件
-        OnDataCollected?.Invoke();
-
-        // 检查是否需要分析
-        if (dataPoints.Count >= 3)
-        {
-            AnalyzeData();
-        }
-    }
     private void AnalyzeData()
     {
         if (dataPoints.Count == 0) return;
@@ -180,11 +202,6 @@ public class DataCollector : MonoBehaviour
     }
 
 
-    // 检查是否需要更多数据
-    public bool NeedMoreData()
-    {
-        return dataPoints.Count < 3;
-    }
 
     #region 检查是否验证实验
     // 检查是否验证了玻意耳定律
@@ -276,6 +293,11 @@ public class DataCollector : MonoBehaviour
     public int GetDataPointCount()
     {
         return dataPoints.Count;
+    }
+
+    public int GetRequiredPointsForLines()
+    {
+        return requiredPointsForLines;
     }
 
     #endregion
