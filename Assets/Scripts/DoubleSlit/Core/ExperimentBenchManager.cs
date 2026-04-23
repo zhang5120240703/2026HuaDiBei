@@ -303,6 +303,8 @@ public class ExperimentBenchManager : MonoBehaviour
 
     private void EndDrag()
     {
+        if (_dragging == null) { _isDragActive = false; return; }
+
         // 松手磁吸
         bool isSnapped = false;
         if (enableSnapAssist && _snapTargets.TryGetValue(_dragging, out Vector3 snapPos))
@@ -320,6 +322,18 @@ public class ExperimentBenchManager : MonoBehaviour
         {
             _dragging.SetValidationResult(true);
         }
+
+        if (enableStepGuide && !isSnapped)
+            PostDropGuide(_dragging);
+
+        if (_validateCo != null) StopCoroutine(_validateCo);
+        _validateCo = StartCoroutine(DeferredValidate());
+
+        // ★ 修复：松手后必须清除拖拽状态，否则下次点击空白处时
+        //   TryBeginDrag() 无命中直接 return，_isDragActive 仍为 true，
+        //   导致 ContinueDrag() 在下一帧继续移动刚放下的物体。
+        _dragging = null;
+        _isDragActive = false;
     }
 
     // ══════════════════════════════════════════════

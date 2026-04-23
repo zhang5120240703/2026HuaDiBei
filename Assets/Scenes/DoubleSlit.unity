@@ -630,99 +630,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 469826681}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!21 &492671120
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: WaveField2D (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance)
-  m_Shader: {fileID: 4800000, guid: e515f8efecf01b0488802f780fe086f7, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailAlbedoMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailMask:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailNormalMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _ParallaxMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _Aspect: 4.2799997
-    - _Brightness: 1.42
-    - _BumpScale: 1
-    - _Cutoff: 0.5
-    - _DetailNormalMapScale: 1
-    - _DstBlend: 0
-    - _GlossMapScale: 1
-    - _Glossiness: 0.5
-    - _GlossyReflections: 1
-    - _Metallic: 0
-    - _Mode: 0
-    - _OcclusionStrength: 1
-    - _Parallax: 0.02
-    - _ShowPhase: 0
-    - _Slit1Y: 0.547
-    - _Slit2Y: 0.453
-    - _SmoothnessTextureChannel: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 1
-    - _TimeScale: 0.93
-    - _UVSec: 0
-    - _VisualK: 36.70085
-    - _ZWrite: 1
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _WaveColor: {r: 0.909786, g: 1, b: 0, a: 1}
-  m_BuildTextureStacks: []
 --- !u!1 &822473367
 GameObject:
   m_ObjectHideFlags: 0
@@ -933,6 +840,106 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 864599842}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!21 &906626924
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: WaveField2D (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance)
+  m_Shader: {fileID: 4800000, guid: e515f8efecf01b0488802f780fe086f7, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Aspect: 4.2799997
+    - _Brightness: 1.42
+    - _BumpScale: 1
+    - _Cutoff: 0.5
+    - _DetailNormalMapScale: 1
+    - _DstBlend: 0
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _Metallic: 0
+    - _Mode: 0
+    - _OcclusionStrength: 1
+    - _Parallax: 0.02
+    - _ShowPhase: 0
+    - _Slit1Y: 0.547
+    - _Slit2Y: 0.453
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _TimeScale: 0.93
+    - _UVSec: 0
+    - _VisualK: 36.70085
+    - _ZWrite: 1
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _WaveColor: {r: 0.12857144, g: 1, b: 0, a: 1}
+  m_BuildTextureStacks: []
 --- !u!1 &1072539300
 GameObject:
   m_ObjectHideFlags: 0
@@ -1075,8 +1082,6 @@ MonoBehaviour:
   animationSpeed: 0.93
   brightness: 1.42
   phaseWaveMode: 0
-  autoColorFromWavelength: 0
-  manualColor: {r: 0.909786, g: 1, b: 0, a: 1}
   slitSepToPlaneHeightRatio: 0.094
 --- !u!64 &1311178101
 MeshCollider:
@@ -1120,7 +1125,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 492671120}
+  - {fileID: 906626924}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1283,6 +1288,7 @@ GameObject:
   - component: {fileID: 1575472551}
   - component: {fileID: 1575472550}
   - component: {fileID: 1575472554}
+  - component: {fileID: 1575472555}
   m_Layer: 0
   m_Name: Opticalbench
   m_TagString: Untagged
@@ -1427,6 +1433,29 @@ MonoBehaviour:
   _debugSSPos: {x: 0, y: 0, z: 0}
   _debugDSPos: {x: 0, y: 0, z: 0}
   _debugScrPos: {x: 0, y: 0, z: 0}
+--- !u!114 &1575472555
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1575472549}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c78ebc0193736454fb119b8cf5ad6143, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  benchManager: {fileID: 0}
+  lutGenerator: {fileID: 0}
+  hintUI: {fileID: 0}
+  experimentController: {fileID: 0}
+  measurementTool: {fileID: 0}
+  parameterManager: {fileID: 0}
+  formulaCalculator: {fileID: 0}
+  lightSource: {fileID: 0}
+  singleSlit: {fileID: 0}
+  doubleSlit: {fileID: 0}
+  screen: {fileID: 0}
 --- !u!1 &1614088843
 GameObject:
   m_ObjectHideFlags: 0
@@ -1437,6 +1466,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1614088845}
   - component: {fileID: 1614088844}
+  - component: {fileID: 1614088847}
+  - component: {fileID: 1614088846}
   m_Layer: 0
   m_Name: TestUI
   m_TagString: Untagged
@@ -1495,6 +1526,47 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1614088846
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1614088843}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab467381ba2aced4f90f88da2fbadb38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  experimentController: {fileID: 0}
+  panelWidth: 300
+  wavelength: 632.8
+  slitDistance: 0.1
+  screenDistance: 1
+  measuredDeltaX: 0.63
+--- !u!114 &1614088847
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1614088843}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c7688ef05906ee4c8be124569983fc0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interferenceRenderer: {fileID: 1812360457}
+  waveFieldRenderer: {fileID: 1311178102}
+  lutGenerator: {fileID: 1812360459}
+  benchManager: {fileID: 0}
+  hintUI: {fileID: 0}
+  parameterManager: {fileID: 0}
+  formulaCalculator: {fileID: 0}
+  measurementTool: {fileID: 0}
+  defaultWavelength: 632.8
+  defaultSlitDistance: 0.1
+  defaultScreenDistance: 1
 --- !u!1 &1812360454
 GameObject:
   m_ObjectHideFlags: 0
@@ -1509,6 +1581,7 @@ GameObject:
   - component: {fileID: 1812360456}
   - component: {fileID: 1812360459}
   - component: {fileID: 1812360460}
+  - component: {fileID: 1812360461}
   m_Layer: 0
   m_Name: Screen
   m_TagString: Untagged
@@ -1615,10 +1688,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   interferenceMaterial: {fileID: 2100000, guid: 36b58239f1a9abf45b7be7f2915c2e2d, type: 2}
-  lutWidth: 1024
-  wavelength: 540
-  slitDistance: 0.305
-  slitWidth: 0.133
+  lutWidth: 830
+  wavelength: 519
+  slitDistance: 0.47
+  slitWidth: 0.164
   screenDistance: 3.87
   screenHalfWidthMm: 20
   isWhiteLight: 0
@@ -1656,6 +1729,25 @@ MonoBehaviour:
   isNearSnap: 0
   isCorrect: 0
   homePosition: {x: 0, y: 0, z: 0}
+--- !u!114 &1812360461
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1812360454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8497db17f3c3938459322f9f7651964f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lutGenerator: {fileID: 1812360459}
+  brightness: 1.2
+  contrast: 1
+  edgeSoftness: 0.08
+  _renderer: {fileID: 0}
+  _mat: {fileID: 0}
+  _visible: 0
 --- !u!1 &1998293746
 GameObject:
   m_ObjectHideFlags: 0

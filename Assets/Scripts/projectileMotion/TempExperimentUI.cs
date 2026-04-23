@@ -489,15 +489,14 @@ public class TempExperimentUI : MonoBehaviour
     {
         PushParamsToController();
         // 尝试通知通用动作管理器参数被修改（非必要）
-        if (UserActionManager.Instance != null)
-            UserActionManager.Instance.CaptureUserAction(UserActionType.ModifyParameter);
+        UserActionManager.Instance?.CaptureUserAction(UserActionType.ModifyParameter);
     }
 
     private void DispatchConfirmParam()
     {
         if (_ctrl != null) _ctrl.ConfirmParam();
-        else if (UserActionManager.Instance != null)
-            UserActionManager.Instance.CaptureUserAction(UserActionType.ConfirmParam);
+        else
+            UserActionManager.Instance?.CaptureUserAction(UserActionType.ConfirmParam);
     }
 
     private void DispatchConfirmObserved()
@@ -510,8 +509,8 @@ public class TempExperimentUI : MonoBehaviour
     private void DispatchConfirmFinish()
     {
         if (_ctrl != null) _ctrl.ConfirmFinish();
-        else if (UserActionManager.Instance != null)
-            UserActionManager.Instance.CaptureUserAction(UserActionType.JumpToNextStep);
+        else
+            UserActionManager.Instance?.CaptureUserAction(UserActionType.JumpToNextStep);
     }
 
     // ══════════════════════════════════════════════════════════════════

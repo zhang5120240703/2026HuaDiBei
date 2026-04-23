@@ -19,8 +19,6 @@ public class WaveFieldVisualizer : MonoBehaviour
     [Range(0.1f, 5f)] public float brightness = 2f;
     [Tooltip("false = 强度干涉纹（平静）  true = 瞬态波形动画（动感）")]
     public bool phaseWaveMode = false;
-    public bool autoColorFromWavelength = true;
-    public Color manualColor = new Color(0.8f, 1f, 0.3f, 1f);
 
     [Header("缝距映射")]
     [Tooltip("缝间距在光场平面高度中的比例，调节使缝位置与挡板对齐")]
@@ -69,78 +67,14 @@ public class WaveFieldVisualizer : MonoBehaviour
         _mat.SetFloat(P_Brt, brightness);
         _mat.SetFloat(P_Ph, phaseWaveMode ? 1f : 0f);
 
-        Color col = autoColorFromWavelength
-            ? (lutGenerator.isWhiteLight ? Color.white : WlToColor(lutGenerator.wavelength))
-            : manualColor;
+        // 波的颜色始终从波长自动获取，保持与光的颜色一致
+        Color col = lutGenerator.isWhiteLight ? Color.white : WlToColor(lutGenerator.wavelength);
         _mat.SetColor(P_Col, col);
     }
 
     static Color WlToColor(float wl)
     {
-        float r, g, b;
-        
-        // ★ 标准可见光谱映射（380nm-780nm）
-        if (wl >= 380f && wl < 440f)
-        {
-            // 紫色（380-440nm）
-            r = -(wl - 440f) / 60f;
-            g = 0f;
-            b = 1f;
-        }
-        else if (wl >= 440f && wl < 490f)
-        {
-            // 蓝色（440-490nm）
-            r = 0f;
-            g = (wl - 440f) / 50f;
-            b = 1f;
-        }
-        else if (wl >= 490f && wl < 510f)
-        {
-            // 青色（490-510nm）
-            r = 0f;
-            g = 1f;
-            b = -(wl - 510f) / 20f;
-        }
-        else if (wl >= 510f && wl < 580f)
-        {
-            // 绿色（510-580nm）
-            r = (wl - 510f) / 70f;
-            g = 1f;
-            b = 0f;
-        }
-        else if (wl >= 580f && wl < 645f)
-        {
-            // 黄色-橙色（580-645nm）
-            r = 1f;
-            g = -(wl - 645f) / 65f;
-            b = 0f;
-        }
-        else if (wl >= 645f && wl <= 780f)
-        {
-            // 红色（645-780nm）
-            r = 1f;
-            g = 0f;
-            b = 0f;
-        }
-        else
-        {
-            // 超出范围
-            r = 0f;
-            g = 0f;
-            b = 0f;
-        }
-
-        // ★ 光谱边缘强度衰减（模拟人眼感知）
-        float factor = (wl >= 380f && wl < 420f)
-            ? 0.3f + 0.7f * (wl - 380f) / 40f
-            : (wl >= 700f && wl <= 780f)
-            ? 0.3f + 0.7f * (780f - wl) / 80f
-            : 1f;
-
-        return new Color(
-            Mathf.Clamp01(r * factor),
-            Mathf.Clamp01(g * factor),
-            Mathf.Clamp01(b * factor),
-            1f);
+        // 使用 DoubleSlitLUTGenerator 的波长转颜色方法，保证颜色一致性
+        return DoubleSlitLUTGenerator.WavelengthToColor(wl);
     }
 }
