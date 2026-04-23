@@ -145,7 +145,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         float currentVolume = GetCurrentVolume();
         float newVolume = VolumeFromPistonY(tentativePistonY);
 
-
+        if (currentVolume < IdealGasSimulation.Instance.GetMinVolume())
+            return;
 
         // 预测压强（根据预测体积）
         float predictedPressure = PredictPressureForVolume(newVolume);
@@ -164,6 +165,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
 
         // 计算当前体积并通知
         float appliedVolume = GetCurrentVolume();
+
+
         OnVolumeChanged?.Invoke(appliedVolume);
     }
 

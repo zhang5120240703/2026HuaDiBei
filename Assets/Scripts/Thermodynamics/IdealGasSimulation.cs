@@ -31,15 +31,15 @@ public class IdealGasSimulation : MonoBehaviour
     
     // 体积范围限制
     private const float minVolume = 0.2f;
-    private const float maxVolume = 1.8f;
+    private const float maxVolume = 2.0f;
     
     // 温度范围限制
-    private const float minTemperature = 100.0f;
+    private const float minTemperature = 50.0f;
     private const float maxTemperature = 500.0f;
     
     // 压力范围限制
-    public const float minPressure = 10.0f;
-    public const float maxPressure = 500.0f;
+    public const float minPressure =50.0f;
+    public const float maxPressure = 1000.0f;
     
     // 事件
     public System.Action<float, float, float> OnStateChanged;
@@ -68,7 +68,7 @@ public class IdealGasSimulation : MonoBehaviour
     {
         // 初始设置
         volume = 1.0f;
-        temperature = 300.0f;
+        temperature = 274.0f;
         UpdatePressure();
         UpdateVolume();
         UpdateTemperature();

@@ -1,6 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
+using static ExperimentStepController;
+using static IdealGasSimulation;
 
 public class DataCollector : MonoBehaviour
 {
@@ -15,7 +18,7 @@ public class DataCollector : MonoBehaviour
         public float temperature; // 温度 (K)
         public float pvProduct; // PV乘积
         public float inverseVolume; // 1/V
-
+        public float inverseTempreture;// 1/T
     }
     
     // 数据记录
@@ -27,15 +30,16 @@ public class DataCollector : MonoBehaviour
     private const float autoCollectInterval = 1.0f;
     private float autoCollectTimer = 0f;
     // 控制：达到多少个数据点后开始绘制连线（Inspector 可调）
-    public int requiredPointsForLines = 10;
+    private int requiredPointsForLines = 8;
     // 最小采样间距（归一化后）。控制相邻数据点不要过近，取值范围 ~0.02-0.2 之间常用
     [Tooltip("归一化的最小距离阈值（0..1），用于避免采集过于接近的数据点）")]
-    public float minNormalizedSpacing = 0.08f;
+    public float minNormalizedSpacing = 0.005f;
     // 分析结果
     private float averagePVProduct;
     private float pvStandardDeviation;
-    private float maxErrorPercentage;
-    
+    private float averageErrorPercentage;
+    private bool isConfirm=false;
+
     // 事件
     public System.Action OnDataCollected;
     public System.Action OnAnalysisCompleted;
@@ -60,16 +64,34 @@ public class DataCollector : MonoBehaviour
             autoCollectTimer = 0f; // 重置自动采集计时器
         }
 
+        NeedAnalyzData();
+    }
+
+    // 确认参数(按钮调用)
+    public void ConfirmParameter()
+    {
+        if (isConfirm)
+        {
+            return;
+        }
+        ExperimentStepController.ExperimentStage currentStage= experimentStepController.GetCurrentStage();
+        if (currentStage != ExperimentStage.DataCollection)
+        {
+            return;
+        }
+        isConfirm = true;
+
 
     }
-    
+
     public void OnVolumeChanged(float newVolume)
     {
         lastVolumeChangeTime = Time.time;
     }
 
 
-    // 创建数据点
+
+    #region 创建数据点
     private DataPoint CreatDataPoint()
     {
         float pressure = IdealGasSimulation.Instance.GetPressure();
@@ -82,7 +104,8 @@ public class DataCollector : MonoBehaviour
             pressure = pressure,
             temperature = temperature,
             pvProduct = pressure * volume,
-            inverseVolume = 1.0f / Mathf.Max(volume, 1e-6f)
+            inverseVolume = 1.0f / Mathf.Max(volume, 1e-6f),
+            inverseTempreture = 1.0f / Mathf.Max(temperature, 1e-6f)
         };
         // 手动检查是否存在相同数据点
         bool exists = dataPoints.Any(p =>
@@ -90,6 +113,7 @@ public class DataCollector : MonoBehaviour
             Mathf.Approximately(p.pressure, point.pressure) &&
             Mathf.Approximately(p.temperature, point.temperature));
 
+            
         if (exists)
         {
             return null;
@@ -99,7 +123,6 @@ public class DataCollector : MonoBehaviour
         {
             return null;
         }
-
 
         return point;
     }
@@ -113,26 +136,41 @@ public class DataCollector : MonoBehaviour
         var sim = IdealGasSimulation.Instance;
         if (sim == null) return false;
 
+        var last = dataPoints[dataPoints.Count - 1];
+
         float minV = sim.GetMinVolume();
         float maxV = sim.GetMaxVolume();
         float minP = sim.GetMinPressure();
         float maxP = sim.GetMaxPressure();
 
-        // 防止除以 0
         float vRange = Mathf.Max(1e-6f, maxV - minV);
         float pRange = Mathf.Max(1e-6f, maxP - minP);
 
-        foreach (var p in dataPoints)
+        float dist = 0f;
+
+        ProcessType type = IdealGasSimulation.Instance.GetCurrentProcess();
+        switch (type)
         {
-            float nx = Mathf.Abs(candidate.volume - p.volume) / vRange;
-            float ny = Mathf.Abs(candidate.pressure - p.pressure) / pRange;
-            float dist = Mathf.Sqrt(nx * nx + ny * ny);
-            if (dist < minNormalizedSpacing)
-                return true;
+            //有问题
+            case ProcessType.Isochoric: // 等容 👉 看压力
+                dist = Mathf.Abs(candidate.pressure - last.pressure) / pRange;
+                break;
+
+            case ProcessType.Isothermal: // 等温 👉 看二维
+                float nx = Mathf.Abs(candidate.volume - last.volume) / vRange;
+                float ny = Mathf.Abs(candidate.pressure - last.pressure) / pRange;
+                dist = Mathf.Sqrt(nx * nx + ny * ny);
+                break;
+
+            case ProcessType.Isobaric: // 等压 👉 看体积
+                dist = Mathf.Abs(candidate.volume - last.volume) / vRange;
+                break;
         }
 
-        return false;
+        return dist < minNormalizedSpacing;
     }
+    #endregion
+
     //自动采集数据
     public void CollectDataPoint()
     {
@@ -146,13 +184,22 @@ public class DataCollector : MonoBehaviour
         // 触发事件
         OnDataCollected?.Invoke();
         
-        // 检查是否需要分析
-        if (dataPoints.Count >= 20)
+        
+    }
+
+    private void NeedAnalyzData()
+    {
+        if(experimentStepController.GetCurrentStage()!=ExperimentStage.DataAnalysis)
+            return; 
+        // 检查是否需要分析(需按下确认按钮)
+        if (dataPoints.Count >= requiredPointsForLines && isConfirm)
         {
             AnalyzeData();
+            isConfirm = false;
         }
     }
 
+    //分析数据
     private void AnalyzeData()
     {
         if (dataPoints.Count == 0) return;
@@ -162,29 +209,29 @@ public class DataCollector : MonoBehaviour
         float sumPVSquared = 0;
         float sumInverseVolume = 0;
         float sumPressure = 0;
-        
+        float sumInverseTempreture = 0;
         foreach (var point in dataPoints)
         {
             sumPV += point.pvProduct;
             sumPVSquared += point.pvProduct * point.pvProduct;
             sumInverseVolume += point.inverseVolume;
             sumPressure += point.pressure;
+            sumInverseTempreture += point.inverseTempreture;
         }
         
         averagePVProduct = sumPV / dataPoints.Count;
         float variance = (sumPVSquared / dataPoints.Count) - (averagePVProduct * averagePVProduct);
         pvStandardDeviation = Mathf.Sqrt(variance);
         
-        // 计算最大误差
-        maxErrorPercentage = 0;
+        // 计算平均误差
+        averageErrorPercentage = 0;
+        float totalError = 0;
         foreach (var point in dataPoints)
         {
-            float error = Mathf.Abs((point.pvProduct - averagePVProduct) / averagePVProduct) * 100f;
-            if (error > maxErrorPercentage)
-            {
-                maxErrorPercentage = error;
-            }
+             totalError=totalError+ Mathf.Abs((point.pvProduct - averagePVProduct) / averagePVProduct) * 100f;
         }
+
+        averageErrorPercentage = totalError / dataPoints.Count;
         
         // 触发分析完成事件
         OnAnalysisCompleted?.Invoke();
@@ -198,7 +245,7 @@ public class DataCollector : MonoBehaviour
         lastVolumeChangeTime = Time.time;
         averagePVProduct = 0;
         pvStandardDeviation = 0;
-        maxErrorPercentage = 0;
+        averageErrorPercentage = 0;
     }
 
 
@@ -207,7 +254,7 @@ public class DataCollector : MonoBehaviour
     // 检查是否验证了玻意耳定律
     public bool IsBoyleLawVerified()
     {
-        return maxErrorPercentage < 3.0f; // 误差控制在3%以内
+        return averageErrorPercentage < 3.0f; // 误差控制在3%以内
     }
     
     // 检查是否验证了盖-吕萨克定律
@@ -222,19 +269,17 @@ public class DataCollector : MonoBehaviour
             sumVT += point.volume / point.temperature;
         }
         float averageVT = sumVT / dataPoints.Count;
-        
+
         // 检查误差
-        float maxError = 0;
+        float sumError = 0;
+        float averageError = 0;
         foreach (var point in dataPoints)
         {
-            float error = Mathf.Abs((point.volume / point.temperature - averageVT) / averageVT) * 100f;
-            if (error > maxError)
-            {
-                maxError = error;
-            }
+            sumError = Mathf.Abs((point.volume / point.temperature - averageVT) / averageVT) * 100f;
+
         }
-        
-        return maxError < 3.0f;
+        averageError = sumError / dataPoints.Count;
+        return averageError < 3.0f;
     }
     
     // 检查是否验证了查理定律
@@ -249,19 +294,17 @@ public class DataCollector : MonoBehaviour
             sumPT += point.pressure / point.temperature;
         }
         float averagePT = sumPT / dataPoints.Count;
-        
+
         // 检查误差
-        float maxError = 0;
+        float sumError = 0;
+        float averageError = 0;
         foreach (var point in dataPoints)
         {
-            float error = Mathf.Abs((point.pressure / point.temperature - averagePT) / averagePT) * 100f;
-            if (error > maxError)
-            {
-                maxError = error;
-            }
+            sumError = Mathf.Abs((point.pressure / point.temperature - averagePT) / averagePT) * 100f;
+
         }
-        
-        return maxError < 3.0f;
+        averageError= sumError / dataPoints.Count;
+        return averageError < 3.0f;
     }
 
     #endregion
@@ -284,9 +327,9 @@ public class DataCollector : MonoBehaviour
         return pvStandardDeviation;
     }
     
-    public float GetMaxErrorPercentage()
+    public float GetAverageErrorPercentage()
     {
-        return maxErrorPercentage;
+        return averageErrorPercentage;
     }
     
     // 获取数据点数量
@@ -298,6 +341,11 @@ public class DataCollector : MonoBehaviour
     public int GetRequiredPointsForLines()
     {
         return requiredPointsForLines;
+    }
+
+    public bool GetIsConfirm()
+    {
+        return isConfirm;
     }
 
     #endregion

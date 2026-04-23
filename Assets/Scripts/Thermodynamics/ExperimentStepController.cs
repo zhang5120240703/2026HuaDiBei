@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 public class ExperimentStepController : MonoBehaviour
 {
@@ -11,7 +12,6 @@ public class ExperimentStepController : MonoBehaviour
     private bool isSelectExp = false;
     private bool isStart=false;
     private bool isReset=false;
-    private bool isConfirm=false;
 
     // 实验阶段
     public enum ExperimentStage
@@ -70,7 +70,6 @@ public class ExperimentStepController : MonoBehaviour
         }
         
         uiManager.SetStep(step);
-        Debug.Log("进入" + stageName);
     }
     
     private void CheckStageCompletion()
@@ -86,13 +85,15 @@ public class ExperimentStepController : MonoBehaviour
             case ExperimentStage.Confirmation:
                 // 确认实验过程阶段：检查是否确认了实验过程
                 // 当用户点击确认按钮时进入数据采集阶段
-                if(isStart)
-                    SetStage(ExperimentStage.DataCollection);
+                if (isStart)
+                {
+                    StartCoroutine(DelayEnterDataCollection());
+                }
                 break;
                 
             case ExperimentStage.DataCollection:
                 // 数据采集阶段：检查是否采集了足够的数据点
-                if (dataCollector.GetDataPointCount() >= 10&&isConfirm)
+                if (dataCollector.GetDataPointCount() >= dataCollector.GetRequiredPointsForLines()&&dataCollector.GetIsConfirm())
                 {
                     SetStage(ExperimentStage.DataAnalysis);
                 }
@@ -101,8 +102,7 @@ public class ExperimentStepController : MonoBehaviour
             case ExperimentStage.DataAnalysis:
                 // 数据分析阶段：检查是否完成了分析
                 // 当数据采集完成时自动进入结论总结阶段
-                
-
+               
                 break;
                 
             case ExperimentStage.Conclusion:
@@ -111,7 +111,13 @@ public class ExperimentStepController : MonoBehaviour
         }
     }
     
-    
+    IEnumerator DelayEnterDataCollection()
+    {
+        yield return new WaitForSeconds(3.0f);
+        SetStage(ExperimentStage.DataCollection);
+
+    }
+
     // 开始实验(按钮调用)
     public void StartExperiment()
     {
@@ -130,7 +136,7 @@ public class ExperimentStepController : MonoBehaviour
     {
         if (!isStart)
         {
-            uiPanel.ShowError("请先开始实验过!");
+            uiPanel.ShowError("请先开始实验!");
             return;
         }
         SetStage(ExperimentStage.Preparation);
@@ -144,19 +150,15 @@ public class ExperimentStepController : MonoBehaviour
         isSelectExp = false;
     }
 
-    // 确认参数(按钮调用)
-    public void ConfirmParameter()
-    {
-        if (currentStage != ExperimentStage.DataCollection)
-        {
-            return;
-        }
-        isConfirm = true;
+    
 
-    }
     // 切换实验过程(按钮调用)
     public void SetProcess(int process)
     {
+        if(isSelectExp)
+        {
+            uiPanel.ShowError("请先重置实验!");
+        }
         IdealGasSimulation.Instance.SetProcess((IdealGasSimulation.ProcessType)process);
         cylinderController.SetCurrentProcess((IdealGasSimulation.ProcessType)process);
         uiManager.SetProcess((IdealGasSimulation.ProcessType)process);

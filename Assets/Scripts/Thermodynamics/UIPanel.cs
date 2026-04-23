@@ -17,7 +17,6 @@ public class UIPanel : MonoBehaviour
     public TMP_Text pvProductText;
     //输入滑动条
     public Slider temperatureSlider;
-    public Slider pressureSlider;
     public Slider volumeSlider;
 
     //状态按钮
@@ -25,19 +24,13 @@ public class UIPanel : MonoBehaviour
     public Button isobaricButton;
     public Button isochoricButton;
 
-    //控制按钮
-    public Button startButton;
-    public Button resetButton;
-    public Button confirmButton;
-
-
     public TMP_Text processText;
     public TMP_Text statusText;
     public TMP_Text progressText;
     public TMP_Text errorText;
     // 实验状态
     private int currentStep = 1;
-    private const int totalSteps = 5;
+    private const int totalSteps = 4;
 
 
     //UI面板
@@ -52,7 +45,6 @@ public class UIPanel : MonoBehaviour
 
         //滑动条输入事件监听
         temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
-        pressureSlider.onValueChanged.AddListener(OnPressureSliderChanged);
         volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
         
         //初始隐藏参数面板
@@ -68,7 +60,6 @@ public class UIPanel : MonoBehaviour
         HideError();
         // 根据初始过程类型设置滑动条显示
         SetTemperatureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
-        SetPressureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
         SetVolumeSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
     }
 
@@ -86,12 +77,10 @@ public class UIPanel : MonoBehaviour
         //使用 SetValueWithoutNotify 避免触发 onValueChanged 回调
         // 这样不会在同步 UI 时意外修改模拟状态
         temperatureSlider.SetValueWithoutNotify(temperature);
-        pressureSlider.SetValueWithoutNotify(pressure);
         volumeSlider.SetValueWithoutNotify(volume);
 
         // 更新Slider的值
         temperatureSlider.value = temperature; // 同步Slider值
-        pressureSlider.value = pressure;
         volumeSlider.value = volume;
     }
 
@@ -127,13 +116,7 @@ public class UIPanel : MonoBehaviour
 
         temperatureSlider.gameObject.SetActive(isActive);//显示或隐藏温度输入滑动条
     }
-    //等压状态不显示PressureSlider
-    private void SetPressureSliderDisplay(IdealGasSimulation.ProcessType process)
-    {
-        bool isActive = process == IdealGasSimulation.ProcessType.Isobaric ? false : true;
 
-        pressureSlider.gameObject.SetActive(isActive);//显示或隐藏压强输入滑动条
-    }
     //等容状态不显示VolumeSlider
     private void SetVolumeSliderDisplay(IdealGasSimulation.ProcessType process)
     {
@@ -149,7 +132,6 @@ public class UIPanel : MonoBehaviour
     public void SetProcess(IdealGasSimulation.ProcessType process)
     {
         SetTemperatureSliderDisplay(process);
-        SetPressureSliderDisplay(process);
         SetVolumeSliderDisplay(process);
         UpdateProcessText(process);
     }
@@ -190,11 +172,9 @@ public class UIPanel : MonoBehaviour
                 statusText.text = "操作指引: 移动活塞或者调整滑动条，系统将自动采集数据";
                 break;
             case 4:
-                statusText.text = "操作指引: 数据收集完成，请点击确认按钮查看图像分析结果";
+                statusText.text = "操作指引: 实验完成，查看图像分析结果(可重置实验)";
                 break;
-            case 5:
-                statusText.text = "操作指引: 实验完成，可重置实验";
-                break;
+
         }
     }
     #endregion
@@ -207,23 +187,26 @@ public class UIPanel : MonoBehaviour
     public void UpdateDataDisplay()
     {
         int dataCount = dataCollector.GetDataPointCount();
-        statusText.text = "已采集 " + dataCount + " 个数据点，继续调整体积";
-        if(dataCount==dataCollector.GetRequiredPointsForLines())
+        int requireCount = dataCollector.GetRequiredPointsForLines();
+        if (dataCount>= requireCount)
         {
-            statusText.text += "数据点收集完毕，点击确认按钮查看实验图像分析结果";
+            statusText.text = "数据点收集完毕，点击确认按钮开始进行图像分析绘制";
         }
+        else
+            statusText.text = "已采集 " + dataCount+"/"+ requireCount+ " 个数据点，继续调整体积";
+
     }
-    
-    
+
+
     public void UpdateAnalysisDisplay()
     {
         // 显示分析结果
         float averagePV = dataCollector.GetAveragePVProduct();
-        float error = dataCollector.GetMaxErrorPercentage();
+        float error = dataCollector.GetAverageErrorPercentage();
         
         string resultText = "分析结果: " + "\n";
         resultText += "平均PV乘积: " + averagePV.ToString("F2") + " kPa·L\n";
-        resultText += "最大误差: " + error.ToString("F2") + "%\n";
+        resultText += "平均误差: " + error.ToString("F2") + "%\n";
         
         // 判断是否验证了定律
         bool verified = false;
@@ -255,14 +238,13 @@ public class UIPanel : MonoBehaviour
         }
         
         statusText.text = resultText;
-        currentStep = 5;
+        currentStep = 4;
         UpdateProgressText();
     }
 
     #region 错误信息的显示控制
     public void ShowError(string message)
     {
-        UnityEngine.Debug.Log("ShowError 被调用");
         errorText.gameObject.SetActive(true);
         errorText.text = "错误: " + message;
     }
