@@ -33,7 +33,7 @@ public class DataCollector : MonoBehaviour
     private int requiredPointsForLines = 8;
     // 最小采样间距（归一化后）。控制相邻数据点不要过近，取值范围 ~0.02-0.2 之间常用
     [Tooltip("归一化的最小距离阈值（0..1），用于避免采集过于接近的数据点）")]
-    public float minNormalizedSpacing = 0.005f;
+    private float minNormalizedSpacing = 0.015f;
     // 分析结果
     private float averagePVProduct;
     private float pvStandardDeviation;
@@ -149,22 +149,26 @@ public class DataCollector : MonoBehaviour
         float dist = 0f;
 
         ProcessType type = IdealGasSimulation.Instance.GetCurrentProcess();
-        switch (type)
+        foreach (var p in dataPoints)
         {
-            //有问题
-            case ProcessType.Isochoric: // 等容 👉 看压力
-                dist = Mathf.Abs(candidate.pressure - last.pressure) / pRange;
-                break;
 
-            case ProcessType.Isothermal: // 等温 👉 看二维
-                float nx = Mathf.Abs(candidate.volume - last.volume) / vRange;
-                float ny = Mathf.Abs(candidate.pressure - last.pressure) / pRange;
-                dist = Mathf.Sqrt(nx * nx + ny * ny);
-                break;
+            switch (type)
+            {
+                case ProcessType.Isochoric: // 等容 👉 只看压力
+                    dist = Mathf.Abs(candidate.pressure - p.pressure) / pRange;
+                    break;
 
-            case ProcessType.Isobaric: // 等压 👉 看体积
-                dist = Mathf.Abs(candidate.volume - last.volume) / vRange;
-                break;
+                case ProcessType.Isothermal: // 等温 👉 看 V + P
+                    float nx = Mathf.Abs(candidate.volume - p.volume) / vRange;
+                    float ny = Mathf.Abs(candidate.pressure - p.pressure) / pRange;
+                    dist = Mathf.Sqrt(nx * nx + ny * ny);
+                    break;
+
+                case ProcessType.Isobaric: // 等压 👉 看体积
+                    dist = Mathf.Abs(candidate.volume - p.volume) / vRange;
+                    break;
+            }
+
         }
 
         return dist < minNormalizedSpacing;

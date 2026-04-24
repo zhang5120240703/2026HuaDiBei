@@ -47,6 +47,15 @@ public class UIPanel : MonoBehaviour
         temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
         volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
         
+        //添加体积范围超出事件监听
+        cylinderController.OnVolumeRangeExceeded += OnVolumeRangeExceeded;
+        
+        //设置滑动条范围
+        volumeSlider.minValue = IdealGasSimulation.Instance.GetMinVolume();
+        volumeSlider.maxValue = IdealGasSimulation.Instance.GetMaxVolume();
+        temperatureSlider.minValue = IdealGasSimulation.Instance.GetMinTemperature();
+        temperatureSlider.maxValue = IdealGasSimulation.Instance.GetMaxTemperature();
+        
         //初始隐藏参数面板
         statusPanel.alpha = 0;
         //初始隐藏输入面板
@@ -61,6 +70,13 @@ public class UIPanel : MonoBehaviour
         // 根据初始过程类型设置滑动条显示
         SetTemperatureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
         SetVolumeSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
+    }
+    
+    // 处理体积范围超出事件
+    private void OnVolumeRangeExceeded(bool isExceeded)
+    {
+        // 当体积超出范围时，更新滑动条的值，确保它与当前体积一致
+        volumeSlider.SetValueWithoutNotify(IdealGasSimulation.Instance.GetVolume());
     }
 
 
@@ -78,21 +94,20 @@ public class UIPanel : MonoBehaviour
         // 这样不会在同步 UI 时意外修改模拟状态
         temperatureSlider.SetValueWithoutNotify(temperature);
         volumeSlider.SetValueWithoutNotify(volume);
-
-        // 更新Slider的值
-        temperatureSlider.value = temperature; // 同步Slider值
-        volumeSlider.value = volume;
     }
 
     #region Slider改变时调用
     public void OnTemperatureSliderChanged(float value)
     {
+
+
         // 使用Slider值来设置温度
         IdealGasSimulation.Instance.SetTemperature(value);
 
     }
     public void OnPressureSliderChanged(float value)
     {
+
         // 使用Slider值来设置压强
         IdealGasSimulation.Instance.SetPressure(value);
 
@@ -100,6 +115,7 @@ public class UIPanel : MonoBehaviour
 
     public void OnVolumeSliderChanged(float value)
     {
+
         // 使用Slider值来设置体积
         IdealGasSimulation.Instance.SetVolume(value);
 

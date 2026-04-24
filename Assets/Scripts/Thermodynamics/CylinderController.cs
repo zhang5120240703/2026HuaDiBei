@@ -84,6 +84,29 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         }
         SmoothChangePiston();
     }
+
+
+    public bool CanChangeState()
+    {
+        var sim= IdealGasSimulation.Instance;
+        float T=sim.GetTemperature();
+        float maxT=sim.GetMaxTemperature();
+        float P=sim.GetPressure();
+        float maxP=sim.GetMaxPressure();
+
+        //温度过高时禁止改变状态
+        bool tempBlocked = T >= maxT;
+
+        //压强过大时禁止改变状态
+        bool pressureBlocked = P >= maxP;
+
+        return (tempBlocked || pressureBlocked);
+    }
+
+
+
+
+
     #region 鼠标拖拽
     public void OnPointerDown(PointerEventData eventData)
     {
@@ -128,35 +151,37 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         // 采用相对于当前活塞位置的增量
         float tentativePistonY = piston.localPosition.y + pistonDeltaY;
 
-        // 限制活塞位置在气缸范围内（先基础范围）
+        // 限制活塞位置在气缸范围内（基础范围）
         float minPistonY = -cylinderHeight / 2;
         float maxPistonY = cylinderHeight / 2;
 
-        if (tentativePistonY < minPistonY)
-        {
-            tentativePistonY = minPistonY;
-        }
-        else if (tentativePistonY > maxPistonY)
-        {
-            tentativePistonY = maxPistonY;
-        }
-
-        // 计算变动前后的体积与当前/预测压强
+        // 计算当前体积和新体积
         float currentVolume = GetCurrentVolume();
         float newVolume = VolumeFromPistonY(tentativePistonY);
 
-        if (currentVolume < IdealGasSimulation.Instance.GetMinVolume())
-            return;
-
-        // 预测压强（根据预测体积）
-        float predictedPressure = PredictPressureForVolume(newVolume);
-        float maxPressure = IdealGasSimulation.Instance.GetMaxPressure();
-
-        // 如果这次移动会进一步减小体积（压缩）且预测压强超过最大压强，则阻止该移动
-        if (newVolume < currentVolume && predictedPressure > maxPressure)
+        // 检查体积边界
+        if (newVolume <= minHeight)
         {
-            // 阻止这次压缩移动，但允许向下（增大体积）的移动
-            Debug.Log("预测压强将超过上限，阻止此次压缩移动。");
+            tentativePistonY = PistonYFromVolume(minHeight);
+            // 触发体积超出范围事件
+            OnVolumeRangeExceeded?.Invoke(true);
+        }
+        else if (newVolume >= maxHeight)
+        {
+            tentativePistonY = PistonYFromVolume(maxHeight);
+            // 触发体积超出范围事件
+            OnVolumeRangeExceeded?.Invoke(true);
+        }
+        else
+        {
+            // 体积在有效范围内
+            OnVolumeRangeExceeded?.Invoke(false);
+        }
+
+        if (newVolume < IdealGasSimulation.Instance.GetMinVolume())
+        {
+            // 触发体积超出范围事件
+            OnVolumeRangeExceeded?.Invoke(true);
             return;
         }
 
@@ -203,10 +228,12 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         // 正在拖拽时，不要覆盖玩家操作
         if (isDragging) return;
 
-
+        // 限制体积在有效范围内
+        float clampedVolume = Mathf.Clamp(volume, minHeight, maxHeight);
+        
         // 根据体积计算目标位置
-        targetPistonY = PistonYFromVolume(volume);
-    }
+        targetPistonY = PistonYFromVolume(clampedVolume);
+    } 
 
 
     private float GetCurrentVolume()
@@ -237,14 +264,6 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         return pistonY;
     }
 
-    // 预测给定体积下的压强（不改变当前状态）
-    private float PredictPressureForVolume(float volume)
-    {
-        float safeVolume = Mathf.Max(volume, minVolumeEpsilon);
-        float pressure = (IdealGasSimulation.Instance.moles * IdealGasSimulation.R * IdealGasSimulation.Instance.GetTemperature()) / safeVolume;
-        return pressure;
-    }
-
     private float GetPressure()
     {
         float volume = GetCurrentVolume();
@@ -253,6 +272,8 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         float pressure = (IdealGasSimulation.Instance.moles * IdealGasSimulation.R * IdealGasSimulation.Instance.GetTemperature()) / safeVolume;
         return Mathf.Clamp(pressure, IdealGasSimulation.Instance.GetMinPressure(), IdealGasSimulation.Instance.GetMaxPressure()); // 保证压强在合理范围内
     }
+
+    // 设置活塞位置（对应体积），会平滑移动到该位置
     public void SetPistonPosition(float volume)
     {
         // 将体积映射到[0, 1]范围

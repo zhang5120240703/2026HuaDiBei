@@ -20,7 +20,6 @@ public class ExperimentStepController : MonoBehaviour
         Confirmation, // 确认实验过程
         DataCollection, // 数据采集
         DataAnalysis, // 数据分析 
-        Conclusion // 结论总结
     }
 
     private ExperimentStage currentStage = ExperimentStage.Preparation;// 当前实验阶段
@@ -63,10 +62,6 @@ public class ExperimentStepController : MonoBehaviour
                 step = 4;
                 stageName = "数据分析";
                 break;
-            case ExperimentStage.Conclusion:
-                step = 5;
-                stageName = "结论总结";
-                break;
         }
         
         uiManager.SetStep(step);
@@ -101,13 +96,8 @@ public class ExperimentStepController : MonoBehaviour
                 
             case ExperimentStage.DataAnalysis:
                 // 数据分析阶段：检查是否完成了分析
-                // 当数据采集完成时自动进入结论总结阶段
-               
                 break;
                 
-            case ExperimentStage.Conclusion:
-                // 结论总结阶段：等待用户查看结果
-                break;
         }
     }
     
@@ -115,7 +105,7 @@ public class ExperimentStepController : MonoBehaviour
     {
         yield return new WaitForSeconds(3.0f);
         SetStage(ExperimentStage.DataCollection);
-
+        uiPanel.UpdateDataDisplay();
     }
 
     // 开始实验(按钮调用)

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
@@ -39,11 +40,18 @@ public class UIManager : MonoBehaviour
         // 体积超出范围时显示错误
         if (isExceeded)
         {
-            uiPanel.ShowError("体积超出允许范围 (0.5L-2.0L)");
+            StartCoroutine(ShowErrorTemporarily("无法移动，体积将超出允许范围 (0.2L-2.0L)"));
         }
 
     }
     
+    IEnumerator  ShowErrorTemporarily(string message, float duration = 2f)
+    {
+        uiPanel.ShowError(message);
+        yield return new WaitForSeconds(duration);
+        uiPanel.HideError();
+    }
+
     private void OnDataCollected()
     {
         // 数据采集完成时更新UI和图表

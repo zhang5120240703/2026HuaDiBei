@@ -327,8 +327,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cylinderController: {fileID: 5000002}
   experimentStepController: {fileID: 7000010}
-  requiredPointsForLines: 10
-  minNormalizedSpacing: 0.08
 --- !u!114 &7000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18204,9 +18202,9 @@ MonoBehaviour:
   m_HandleRect: {fileID: 2006546484}
   m_Direction: 0
   m_MinValue: 30
-  m_MaxValue: 500
+  m_MaxValue: 550
   m_WholeNumbers: 0
-  m_Value: 500
+  m_Value: 55
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []

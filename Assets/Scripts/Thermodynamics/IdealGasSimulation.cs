@@ -35,10 +35,10 @@ public class IdealGasSimulation : MonoBehaviour
     
     // 温度范围限制
     private const float minTemperature = 50.0f;
-    private const float maxTemperature = 500.0f;
+    private const float maxTemperature = 550.0f;
     
     // 压力范围限制
-    public const float minPressure =50.0f;
+    public const float minPressure =10.0f;
     public const float maxPressure = 1000.0f;
     
     // 事件
