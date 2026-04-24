@@ -1,0 +1,2 @@
+1.平抛实验没什么操作要求。相关接口见脚本ProjectileExperimentController底部表格，数据见SimulationDataBuffer。
+2.双缝干涉实验操作说明：第一步需要调节各个参数，包括光的波长，光屏到双缝的间距，双缝间距。需要用拖动实验器材到对应位置，按住shift上下拖动。
