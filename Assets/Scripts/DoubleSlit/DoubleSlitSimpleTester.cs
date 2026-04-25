@@ -67,6 +67,24 @@ public class DoubleSlitSimpleTester : MonoBehaviour
 
         var step = Ctrl()?.CurrentStep ?? DoubleSlitSimpleController.ExperimentStep.Setup;
 
+        bool hasCtrl = Ctrl() != null;
+        bool hasHintUI = Ctrl() != null && Ctrl().hintUI != null;
+        bool hasLUT = Ctrl() != null && Ctrl().lutGenerator != null;
+        bool hasRenderer = Ctrl() != null && Ctrl().interferenceRenderer != null;
+
+        if (!hasCtrl || !hasHintUI || !hasLUT || !hasRenderer)
+        {
+            GUI.color = new Color(1f, 0.5f, 0.2f);
+            string warn = "⚠ 组件缺失:";
+            if (!hasCtrl) warn += " [控制器]";
+            if (!hasHintUI) warn += " [HintUI]";
+            if (!hasLUT) warn += " [LUTGen]";
+            if (!hasRenderer) warn += " [光屏Renderer]";
+            GUILayout.Label(warn, _sBold);
+            GUI.color = Color.white;
+            Div();
+        }
+
         // ── 步骤 1 ─────────────────────────────────────────────
         StepHead("① 参数设置", step == DoubleSlitSimpleController.ExperimentStep.Setup);
 
@@ -86,8 +104,6 @@ public class DoubleSlitSimpleTester : MonoBehaviour
         GUILayout.Label($"  预测 Δx ≈ {preview:F3} mm", _sLabel);
         GUI.color = Color.white;
         GUILayout.Space(4);
-
-        bool hasCtrl = Ctrl() != null;
 
         GUI.enabled = hasCtrl;
         if (Btn("应用参数"))

@@ -47,7 +47,7 @@ public class ExperimentItem : MonoBehaviour
     // ══════════════════════════════════════════════
 
     private MaterialPropertyBlock[] _mpbs;
-    static readonly int s_Emission = Shader.PropertyToID("_EmissionColor");
+    static readonly int s_Emission = Shader.PropertyToID("_EmissionColor");// 假设使用的材质支持这些属性，实际项目中可能需要根据具体Shader调整
     static readonly int s_BaseCol = Shader.PropertyToID("_BaseColor");
     static readonly int s_Col = Shader.PropertyToID("_Color");
 
@@ -163,13 +163,21 @@ public class ExperimentItem : MonoBehaviour
             VS.Error => errorColor * 0.5f,
             _ => Color.black
         };
+        Color baseCol = state switch
+        {
+            VS.Dragging => draggingColor,
+            VS.SnapHint => snapHintColor,
+            VS.Correct => correctColor,
+            VS.Error => errorColor,
+            _ => Color.white
+        };
         for (int i = 0; i < targetRenderers.Length; i++)
         {
             if (targetRenderers[i] == null) continue;
             targetRenderers[i].GetPropertyBlock(_mpbs[i]);
             _mpbs[i].SetColor(s_Emission, emit);
-            _mpbs[i].SetColor(s_BaseCol, Color.white);
-            _mpbs[i].SetColor(s_Col, Color.white);
+            _mpbs[i].SetColor(s_BaseCol, baseCol);
+            _mpbs[i].SetColor(s_Col, baseCol);
             targetRenderers[i].SetPropertyBlock(_mpbs[i]);
         }
     }

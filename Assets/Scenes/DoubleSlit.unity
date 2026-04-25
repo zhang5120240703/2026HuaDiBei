@@ -258,7 +258,7 @@ Transform:
   m_GameObject: {fileID: 177631767}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.76, y: 5.8, z: -12.85}
+  m_LocalPosition: {x: -10.83, y: 5.8, z: -37.99}
   m_LocalScale: {x: 0.6, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -389,7 +389,7 @@ Transform:
   m_GameObject: {fileID: 189980872}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.76, y: 5.8, z: -27.37}
+  m_LocalPosition: {x: -10.83, y: 5.8, z: -27.37}
   m_LocalScale: {x: 0.6, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -840,7 +840,7 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 864599842}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!21 &906626924
+--- !u!21 &912055516
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -858,7 +858,15 @@ Material:
     (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
     (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
     (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance)
   m_Shader: {fileID: 4800000, guid: e515f8efecf01b0488802f780fe086f7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -938,7 +946,7 @@ Material:
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _WaveColor: {r: 0.12857144, g: 1, b: 0, a: 1}
+    - _WaveColor: {r: 1, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
 --- !u!1 &1072539300
 GameObject:
@@ -1125,7 +1133,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 906626924}
+  - {fileID: 912055516}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1163,13 +1171,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1311178099}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -10.96, y: 5.88, z: -32.79}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0.7071068, w: 0}
+  m_LocalPosition: {x: -10.96, y: 5.88, z: -21.71}
   m_LocalScale: {x: 10.7, y: 2.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 180}
 --- !u!1 &1317708251
 GameObject:
   m_ObjectHideFlags: 0
@@ -1376,7 +1384,7 @@ Transform:
   m_GameObject: {fileID: 1575472549}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -10.83194, y: 4.414033, z: -25.27}
+  m_LocalPosition: {x: -10.83, y: 4.414033, z: -25.27}
   m_LocalScale: {x: 0.6640443, y: 0.34072846, z: 26.76495}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1401,7 +1409,7 @@ MonoBehaviour:
   benchTransform: {fileID: 1575472553}
   benchAxis: 0
   opticalAxisY: 5.8
-  opticalAxisX: -10.83
+  opticalAxisX: -11
   boundsMin: {x: -23, y: 2.18, z: -59}
   boundsMax: {x: 6, y: 10, z: 10}
   xzSensitivity: 1
@@ -1410,12 +1418,12 @@ MonoBehaviour:
   minSpacing: 0.22
   enableSnapAssist: 1
   snapRadius: 0.5
-  snapPosLight: {x: -10.76, y: 5.8, z: -12.85}
-  snapPosSingle: {x: -10.76, y: 5.8, z: -22.75}
-  snapPosDouble: {x: -10.76, y: 5.8, z: -27.37}
-  snapPosScreen: {x: -10.83194, y: 5.8, z: -38}
+  snapPosLight: {x: -10.83, y: 5.8, z: -37.99}
+  snapPosSingle: {x: -10.83, y: 5.8, z: -32.17}
+  snapPosDouble: {x: -10.83, y: 5.8, z: -27.37}
+  snapPosScreen: {x: -10.83, y: 5.8, z: -16.32}
   heightTolerance: 0.08
-  xAlignTolerance: 0.06
+  xAlignTolerance: 0.3
   orderMinGap: 0.12
   enableStepGuide: 1
   onExperimentCorrect:
@@ -1445,17 +1453,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c78ebc0193736454fb119b8cf5ad6143, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  benchManager: {fileID: 0}
-  lutGenerator: {fileID: 0}
-  hintUI: {fileID: 0}
-  experimentController: {fileID: 0}
-  measurementTool: {fileID: 0}
-  parameterManager: {fileID: 0}
-  formulaCalculator: {fileID: 0}
   lightSource: {fileID: 0}
   singleSlit: {fileID: 0}
   doubleSlit: {fileID: 0}
-  screen: {fileID: 0}
 --- !u!1 &1614088843
 GameObject:
   m_ObjectHideFlags: 0
@@ -1468,6 +1468,7 @@ GameObject:
   - component: {fileID: 1614088844}
   - component: {fileID: 1614088847}
   - component: {fileID: 1614088846}
+  - component: {fileID: 1614088848}
   m_Layer: 0
   m_Name: TestUI
   m_TagString: Untagged
@@ -1541,8 +1542,8 @@ MonoBehaviour:
   experimentController: {fileID: 0}
   panelWidth: 300
   wavelength: 632.8
-  slitDistance: 0.1
-  screenDistance: 1
+  slitDistance: 0.4
+  screenDistance: 3.5
   measuredDeltaX: 0.63
 --- !u!114 &1614088847
 MonoBehaviour:
@@ -1565,8 +1566,23 @@ MonoBehaviour:
   formulaCalculator: {fileID: 0}
   measurementTool: {fileID: 0}
   defaultWavelength: 632.8
-  defaultSlitDistance: 0.1
-  defaultScreenDistance: 1
+  defaultSlitDistance: 0.398
+  defaultScreenDistance: 3.17
+--- !u!114 &1614088848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1614088843}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c78ebc0193736454fb119b8cf5ad6143, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lightSource: {fileID: 177631767}
+  singleSlit: {fileID: 2131167261}
+  doubleSlit: {fileID: 189980872}
 --- !u!1 &1812360454
 GameObject:
   m_ObjectHideFlags: 0
@@ -1581,7 +1597,6 @@ GameObject:
   - component: {fileID: 1812360456}
   - component: {fileID: 1812360459}
   - component: {fileID: 1812360460}
-  - component: {fileID: 1812360461}
   m_Layer: 0
   m_Name: Screen
   m_TagString: Untagged
@@ -1597,13 +1612,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1812360454}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -10.83194, y: 5.8, z: -38}
+  m_LocalRotation: {x: 0, y: -1, z: 0, w: 0}
+  m_LocalPosition: {x: -10.83, y: 5.8, z: -16.32}
   m_LocalScale: {x: 5, y: 2.5, z: 0.13868624}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -180, z: 0}
 --- !u!65 &1812360456
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1688,11 +1703,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   interferenceMaterial: {fileID: 2100000, guid: 36b58239f1a9abf45b7be7f2915c2e2d, type: 2}
+  interferenceRenderer: {fileID: 1812360457}
   lutWidth: 830
-  wavelength: 519
-  slitDistance: 0.47
-  slitWidth: 0.164
-  screenDistance: 3.87
+  wavelength: 674
+  slitDistance: 0.841
+  slitWidth: 0.151
+  screenDistance: 2.58
   screenHalfWidthMm: 20
   isWhiteLight: 0
   lightSourceTf: {fileID: 177631771}
@@ -1729,25 +1745,6 @@ MonoBehaviour:
   isNearSnap: 0
   isCorrect: 0
   homePosition: {x: 0, y: 0, z: 0}
---- !u!114 &1812360461
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1812360454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8497db17f3c3938459322f9f7651964f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  lutGenerator: {fileID: 1812360459}
-  brightness: 1.2
-  contrast: 1
-  edgeSoftness: 0.08
-  _renderer: {fileID: 0}
-  _mat: {fileID: 0}
-  _visible: 0
 --- !u!1 &1998293746
 GameObject:
   m_ObjectHideFlags: 0
@@ -1940,7 +1937,7 @@ Transform:
   m_GameObject: {fileID: 2131167261}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.76, y: 5.8, z: -22.64}
+  m_LocalPosition: {x: -10.83, y: 5.8, z: -32.17}
   m_LocalScale: {x: 0.6, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

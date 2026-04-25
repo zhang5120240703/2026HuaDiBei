@@ -132,9 +132,9 @@ public class ExperimentBenchManager : MonoBehaviour
     // ══════════════════════════════════════════════
 
     [Header("── 事件回调 ──")]
-    public UnityEvent onExperimentCorrect;
-    public UnityEvent onExperimentIncorrect;
-    public StringEvent onHintMessage;
+    public UnityEvent onExperimentCorrect;/// 实验摆放正确事件（可绑定播放动画等反馈）
+    public UnityEvent onExperimentIncorrect;/// 实验摆放错误事件（可绑定播放动画等反馈）
+    public StringEvent onHintMessage;// 提示消息事件（参数为提示文本，UI模块可绑定显示在界面上）
 
     // ══════════════════════════════════════════════
     //  调试（只读）
@@ -142,31 +142,30 @@ public class ExperimentBenchManager : MonoBehaviour
 
     [Header("── 调试（只读，运行时查看）──")]
     [SerializeField] private string _debugDragMode;
-    [SerializeField] private Vector3 _debugDragPos;
-    [SerializeField] private Vector3 _debugLightPos, _debugSSPos, _debugDSPos, _debugScrPos;
+    [SerializeField] private Vector3 _debugDragPos;// 当前被拖拽物体的实时位置（世界坐标）
+    [SerializeField] private Vector3 _debugLightPos, _debugSSPos, _debugDSPos, _debugScrPos;// 各器材当前位置（世界坐标）
 
     // ══════════════════════════════════════════════
     //  枚举
     // ══════════════════════════════════════════════
 
-    public enum BenchAxisChoice { Forward, Right, Up }
+    public enum BenchAxisChoice { Forward, Right, Up }// 光具座轴线选项（默认 Forward = +Z 轴）
 
-    private enum DragMode { XZ, YOnly, XOnly }   // 根据修饰键切换
+    private enum DragMode { XZ, YOnly, XOnly }// 拖拽模式（根据修饰键切换）
 
     // ══════════════════════════════════════════════
     //  私有字段
     // ══════════════════════════════════════════════
 
-    private Camera _cam;
-    private ExperimentItem _dragging;
-    private DragMode _dragMode;
+    private Camera _cam;// 主相机引用
+    private ExperimentItem _dragging;// 当前被拖拽物体
+    private DragMode _dragMode;// 当前拖拽模式
     private Vector2 _prevMouseScreen;   // 上一帧鼠标屏幕位置（Vector2）
-    private bool _isDragActive;
+    private bool _isDragActive;// 是否正在拖拽    
+    private ExperimentItem[] _items;// 所有器材引用
+    private Dictionary<ExperimentItem, Vector3> _snapTargets;// 磁吸目标位置字典
 
-    private ExperimentItem[] _items;
-    private Dictionary<ExperimentItem, Vector3> _snapTargets;
-
-    private Coroutine _validateCo;
+    private Coroutine _validateCo;// 延迟验证协程引用（拖拽结束后延迟一小段时间再验证，避免误判）
 
     // ══════════════════════════════════════════════
     //  生命周期
@@ -194,12 +193,12 @@ public class ExperimentBenchManager : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetMouseButtonDown(0)) { TryBeginDrag(); return; }
-
-        if (_isDragActive)
+        if (Input.GetMouseButtonDown(0)) { TryBeginDrag(); return; }// 鼠标左键按下尝试开始拖拽，成功后本帧不继续执行后续代码，避免误触发 TryBeginDrag 后立即进入 ContinueDrag
+        //作用是：当用户按下鼠标左键时，TryBeginDrag() 会尝试开始拖拽一个器材。如果成功开始拖拽（即用户点击在一个可拖拽物体上），则本帧的 Update() 方法会立即返回，不会继续执行后续的拖拽更新逻辑（ContinueDrag()）。这样可以避免在同一帧内既开始了拖拽又继续处理拖拽逻辑，导致不必要的计算或状态更新。
+        if (_isDragActive)// 如果正在拖拽中，继续处理拖拽逻辑
         {
-            if (Input.GetMouseButton(0)) ContinueDrag();
-            else EndDrag();
+            if (Input.GetMouseButton(0)) ContinueDrag();// 鼠标左键持续按下，继续拖拽
+            else EndDrag();// 鼠标左键松开，结束拖拽
         }
     }
 
@@ -207,10 +206,10 @@ public class ExperimentBenchManager : MonoBehaviour
     //  拖拽核心（屏幕空间增量法）
     // ══════════════════════════════════════════════
 
-    private void TryBeginDrag()
+    private void TryBeginDrag()// 尝试开始拖拽，命中一个器材且该器材在管理列表中才算成功开始拖拽
     {
-        if (_cam == null) return;
-        Ray ray = _cam.ScreenPointToRay(Input.mousePosition);
+        if (_cam == null) return;// 没有相机无法进行射线检测
+        Ray ray = _cam.ScreenPointToRay(Input.mousePosition);//
         if (!Physics.Raycast(ray, out RaycastHit hit, 300f)) return;
 
         ExperimentItem item = hit.collider.GetComponentInParent<ExperimentItem>();
@@ -305,35 +304,31 @@ public class ExperimentBenchManager : MonoBehaviour
     {
         if (_dragging == null) { _isDragActive = false; return; }
 
-        // 松手磁吸
+        ExperimentItem released = _dragging;
+        _dragging = null;
+        _isDragActive = false;
+
         bool isSnapped = false;
-        if (enableSnapAssist && _snapTargets.TryGetValue(_dragging, out Vector3 snapPos))
+        if (enableSnapAssist && _snapTargets.TryGetValue(released, out Vector3 snapPos))
         {
-            if (Vector3.Distance(_dragging.transform.position, snapPos) < snapRadius)
+            float dist = Vector3.Distance(released.transform.position, snapPos);
+            Debug.Log($"[EndDrag] {released.displayName} 距离推荐位 {dist:F3}m (阈值{snapRadius})");
+            if (dist < snapRadius)
             {
-                _dragging.transform.position = snapPos;
-                onHintMessage?.Invoke($"✔ {_dragging.displayName} 已吸附到推荐位置");
+                released.transform.position = snapPos;
+                onHintMessage?.Invoke($"✔ {released.displayName} 已吸附到推荐位置");
                 isSnapped = true;
             }
         }
 
-        _dragging.SetDragging(false);
-        if (isSnapped)
-        {
-            _dragging.SetValidationResult(true);
-        }
+        released.SetDragging(false);
 
         if (enableStepGuide && !isSnapped)
-            PostDropGuide(_dragging);
+            PostDropGuide(released);
 
         if (_validateCo != null) StopCoroutine(_validateCo);
         _validateCo = StartCoroutine(DeferredValidate());
-
-        // ★ 修复：松手后必须清除拖拽状态，否则下次点击空白处时
-        //   TryBeginDrag() 无命中直接 return，_isDragActive 仍为 true，
-        //   导致 ContinueDrag() 在下一帧继续移动刚放下的物体。
-        _dragging = null;
-        _isDragActive = false;
+        Debug.Log($"[EndDrag] 释放 {released.displayName}, 吸附={isSnapped}, 将在0.12s后验证");
     }
 
     // ══════════════════════════════════════════════
@@ -390,7 +385,11 @@ public class ExperimentBenchManager : MonoBehaviour
     private IEnumerator DeferredValidate()
     {
         yield return new WaitForSeconds(0.12f);
-        ValidateSetup();
+        Debug.Log("[DeferredValidate] 开始验证...");
+        var result = ValidateSetup();
+        Debug.Log($"[DeferredValidate] 验证结果: correct={result.isCorrect}, errors={result.errors.Count}");
+        if (!result.isCorrect) foreach (var e in result.errors) Debug.Log($"  {e}");
+        RefreshDebugPos();
         _validateCo = null;
     }
 
@@ -436,7 +435,12 @@ public class ExperimentBenchManager : MonoBehaviour
         }
 
         result.isCorrect = result.errors.Count == 0;
-        ApplyFeedback(result);
+
+        if (!result.isCorrect)
+        {
+            Debug.Log("[ValidateSetup] 逐项偏差检查:");
+            foreach (var it in _items) { if (it != null) LogAxisDeviation(it); }
+        }
 
         if (result.isCorrect)
         {
@@ -451,22 +455,29 @@ public class ExperimentBenchManager : MonoBehaviour
         return result;
     }
 
-    private void ApplyFeedback(ValidationResult r)
+    private void LogAxisDeviation(ExperimentItem item)
     {
-        if (r.isCorrect) { foreach (var it in _items) it.SetValidationResult(true); return; }
-        lightSource.SetValidationResult(IsItemCorrect(lightSource));
-        singleSlit.SetValidationResult(IsItemCorrect(singleSlit));
-        doubleSlit.SetValidationResult(IsItemCorrect(doubleSlit));
-        screen.SetValidationResult(IsItemCorrect(screen));
+        Vector3 pos = item.transform.position;
+        float dx = Mathf.Abs(pos.x - opticalAxisX); bool xOk = dx <= xAlignTolerance;
+        float dy = Mathf.Abs(pos.y - opticalAxisY); bool yOk = dy <= heightTolerance;
+        bool bndX = pos.x >= boundsMin.x && pos.x <= boundsMax.x;
+        bool bndY = pos.y >= boundsMin.y && pos.y <= boundsMax.y;
+        bool bndZ = pos.z >= boundsMin.z && pos.z <= boundsMax.z;
+        Debug.Log($"[AxisCheck] {item.displayName}: pos=({pos.x:F3},{pos.y:F3},{pos.z:F3}) " +
+                  $"| Δx={dx:F3}(tol={xAlignTolerance}) {(xOk?"✓":"✗")} " +
+                  $"Δy={dy:F3}(tol={heightTolerance}) {(yOk?"✓":"✗")} " +
+                  $"Bounds:[X{(bndX?"✓":"✗")} Y{(bndY?"✓":"✗")} Z{(bndZ?"✓":"✗")}] " +
+                  $"total={(xOk&&yOk&&bndX&&bndY&&bndZ?"PASS":"FAIL")}");
     }
 
-    private bool IsItemCorrect(ExperimentItem item)
+    private bool IsItemOnOpticalAxis(ExperimentItem item)
     {
-        if (!_snapTargets.TryGetValue(item, out Vector3 snapPos)) return false;
         Vector3 pos = item.transform.position;
-        if (Vector3.Distance(pos, snapPos) > snapRadius) return false;
         if (Mathf.Abs(pos.y - opticalAxisY) > heightTolerance) return false;
         if (Mathf.Abs(pos.x - opticalAxisX) > xAlignTolerance) return false;
+        if (pos.x < boundsMin.x || pos.x > boundsMax.x ||
+            pos.y < boundsMin.y || pos.y > boundsMax.y ||
+            pos.z < boundsMin.z || pos.z > boundsMax.z) return false;
         return true;
     }
 
@@ -544,7 +555,7 @@ public class ExperimentBenchManager : MonoBehaviour
         onHintMessage?.Invoke("🔄 已重置，请重新摆放器材");
     }
 
-    public void TriggerValidate() => ValidateSetup();
+    public void TriggerValidate() => ValidateSetup();// 手动触发验证（UI 按钮绑定）
 
     public void SetSnapAssist(bool on)
     {
@@ -589,9 +600,9 @@ public class ExperimentBenchManager : MonoBehaviour
     private float BenchTFromWorld(Vector3 corner)
         => GetBenchT(corner);
 
-    private void BuildSnapTargets()
+    private void BuildSnapTargets()// 构建器材到推荐位置的字典
     {
-        _snapTargets = new Dictionary<ExperimentItem, Vector3>(4);
+        _snapTargets = new Dictionary<ExperimentItem, Vector3>(4);// 注意：如果某个器材引用未指定，则不加入字典，避免后续使用时 NullReference 错误
         if (lightSource != null) _snapTargets[lightSource] = snapPosLight;
         if (singleSlit != null) _snapTargets[singleSlit] = snapPosSingle;
         if (doubleSlit != null) _snapTargets[doubleSlit] = snapPosDouble;

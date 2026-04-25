@@ -1,4 +1,4 @@
-﻿
+
 
 using System.Collections;
 using UnityEngine;
@@ -15,6 +15,8 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
 {
     [Header("材质")]
     public Material interferenceMaterial;
+    [Tooltip("干涉条纹 Quad 的 Renderer（用于直接写入 MaterialPropertyBlock，解决材质实例不一致问题）")]
+    public Renderer interferenceRenderer;
     [Range(64, 2048)] public int lutWidth = 1024;
 
     [Header("物理参数")]
@@ -51,6 +53,9 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
     //外部强制隐藏光束标志
     private bool _beamsForceHidden = false;// 防止协程自动把光束重新打开
 
+    private MaterialPropertyBlock _rendererMPB;
+    static readonly int s_LUT = Shader.PropertyToID("_LUT");
+
     private static readonly GradientColorKey[] s_monoColorKeys = new GradientColorKey[2];
     private static readonly GradientAlphaKey[] s_monoAlphaKeys = new GradientAlphaKey[2];
     private static readonly GradientColorKey[] s_rainbowColorKeys = new GradientColorKey[5];
@@ -70,19 +75,37 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
     {
         if (!Application.isPlaying) return;
         InitBeamRenderers();
-        // ★ 启动时光束隐藏，等 SimpleController 调用 SetBeamsEnabled(true)
         SetBeamsEnabledInternal(false);
         SyncWatchValues();
-        // 预备一个 1x1 白色纹理用于第一阶段显示白色屏幕
+
+        AutoFindInterferenceRenderer();
+
         whiteLUTTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false, true);
         whiteLUTTexture.SetPixel(0, 0, Color.white);
         whiteLUTTexture.Apply(false, false);
 
-        GenerateLUT();      // 生成 LUT
-        SetLUTVisible(false);  // 第一阶段隐藏LUT，显示白色光屏
+        GenerateLUT();
+        SetLUTVisible(false);
         if (enableRuntimeUpdate)
             StartCoroutine(RuntimeUpdateCoroutine());
-        Debug.Log("[DoubleSlit] LUT 生成器初始化完成");
+        Debug.Log("[DoubleSlit] LUT 生成器初始化完成" + (interferenceRenderer != null ? "（已找到渲染器）" : "（未找到干涉图样渲染器！）"));
+    }
+
+    private void AutoFindInterferenceRenderer()
+    {
+        if (interferenceRenderer != null) return;
+        foreach (var r in FindObjectsOfType<Renderer>())
+        {
+            var m = r.sharedMaterial;
+            if (m != null && m.shader != null && m.shader.name == "Custom/DoubleSlit")
+            {
+                interferenceRenderer = r;
+                Debug.Log($"[LUTGen] AutoFindInterferenceRenderer 找到: {r.name} (mat={m.name})");
+                break;
+            }
+        }
+        if (interferenceRenderer == null)
+            Debug.LogError("[LUTGen] 未找到任何使用 Custom/DoubleSlit Shader 的 Renderer！请在 Inspector 手动拖入。");
     }
 
     void OnValidate()
@@ -119,6 +142,7 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
     /// <summary>强制立即重新生成 LUT（外部调用）</summary>
     public void ForceRegenerate()
     {
+        Debug.Log($"[LUTGen] ForceRegenerate λ={wavelength} d={slitDistance} L={screenDistance} _lutVisible={_lutVisible}");
         GenerateLUT();
         UpdateBeamVisuals();
     }
@@ -128,25 +152,47 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
     /// true = 显示干涉图案（有LUT纹理）
     /// false = 显示白色（无LUT纹理）
     /// </summary>
-    public void SetLUTVisible(bool visible)//关注
+    public void SetLUTVisible(bool visible)
     {
         _lutVisible = visible;
-        if (interferenceMaterial == null) return;
+        Texture2D tex = visible ? lutTexture : whiteLUTTexture;
 
-        if (visible)
+        Debug.Log($"[LUTGen] SetLUTVisible({visible}) tex={(tex!=null)} renderer={(interferenceRenderer!=null)} mat={(interferenceMaterial!=null)}");
+
+        if (interferenceMaterial != null)
         {
-            // 显示干涉图案：应用LUT纹理
-            if (lutTexture != null)
-                interferenceMaterial.SetTexture("_LUT", lutTexture);
-        }
-        else
-        {
-            // 显示白色：应用 1x1 白色纹理（比设置 null 更可靠，避免 Shader 采样返回黑色）
-            if (whiteLUTTexture != null)
-                interferenceMaterial.SetTexture("_LUT", whiteLUTTexture);
+            if (tex != null)
+                interferenceMaterial.SetTexture("_LUT", tex);
             else
                 interferenceMaterial.SetTexture("_LUT", null);
         }
+
+        ApplyLUTToRenderer(tex);
+        ApplyLUTToMaterialInstance(tex);
+    }
+
+    private void ApplyLUTToRenderer(Texture2D tex)
+    {
+        if (interferenceRenderer == null || tex == null) return;
+        if (_rendererMPB == null) _rendererMPB = new MaterialPropertyBlock();
+        interferenceRenderer.GetPropertyBlock(_rendererMPB);
+        _rendererMPB.SetTexture(s_LUT, tex);
+        interferenceRenderer.SetPropertyBlock(_rendererMPB);
+        Debug.Log($"[LUTGen] ApplyLUTToRenderer MPB写入完成, tex={tex.name}");
+    }
+
+    private void ApplyLUTToMaterialInstance(Texture2D tex)
+    {
+        if (interferenceRenderer == null) { Debug.LogWarning("[LUTGen] ApplyLUTToMaterialInstance: interferenceRenderer 为空!"); return; }
+        if (tex == null) { Debug.LogWarning("[LUTGen] ApplyLUTToMaterialInstance: tex 为空!"); return; }
+        var mat = interferenceRenderer.material;
+        if (mat != null)
+        {
+            mat.SetTexture("_LUT", tex);
+            var verify = mat.GetTexture("_LUT");
+            Debug.Log($"[LUTGen] ApplyLUTToMaterialInstance 写入完成, 验证_LUT={(verify!=null?$"{verify.width}x{verify.height}":"null")}");
+        }
+        else Debug.LogWarning("[LUTGen] ApplyLUTToMaterialInstance: renderer.material 为空!");
     }
 
     // ── 协程 ──────────────────────────────────────────────────────
@@ -222,10 +268,12 @@ public class DoubleSlitLUTGenerator : MonoBehaviour
 
         lutTexture.SetPixels32(pixelBuffer);
         lutTexture.Apply(false);
-    // 仅在当前应显示 LUT 时，才把纹理应用到材质上。
-    // 否则只更新内存中的 lutTexture，材质仍保持白屏或现有纹理。
-    if (_lutVisible && interferenceMaterial != null)
-        interferenceMaterial.SetTexture("_LUT", lutTexture);
+        if (_lutVisible)
+        {
+            if (interferenceMaterial != null)
+                interferenceMaterial.SetTexture("_LUT", lutTexture);
+            ApplyLUTToRenderer(lutTexture);
+        }
 
         prevWavelength = wavelength; prevSlitDistance = slitDistance;
         prevSlitWidth = slitWidth; prevScreenDistance = screenDistance;
