@@ -22,6 +22,13 @@ public class DoubleSlitSimpleController : MonoBehaviour
     [Range(0.01f, 1f)] public float defaultSlitDistance = 0.47f;
     [Range(0.1f, 5f)] public float defaultScreenDistance = 3.8f;
 
+    [Header("── 相机切换 ──")]
+    public Camera mainCamera;
+    public Camera frontViewCamera;
+    private bool _isFrontView = false;
+
+    public bool IsFrontView => _isFrontView;
+
     public enum ExperimentStep { Setup, Observe, Measure }
     private ExperimentStep _step = ExperimentStep.Setup;
     private bool _paramsValid = false;
@@ -152,12 +159,33 @@ public class DoubleSlitSimpleController : MonoBehaviour
                + (_error < 10f ? $"✅ 误差 {_error:F1}%，通过！" : $"⚠ 误差 {_error:F1}%，请重测"));
     }
 
+    public void ToggleFrontViewCamera()
+    {
+        if (mainCamera == null || frontViewCamera == null)
+        {
+            Log("[相机切换] 主相机或前视相机未设置！请在 Inspector 中拖入引用。");
+            ShowHint("⚠ 相机未配置！\n请在 Inspector 中设置 mainCamera 和 frontViewCamera。");
+            return;
+        }
+
+        _isFrontView = !_isFrontView;
+        frontViewCamera.enabled = _isFrontView;
+        mainCamera.enabled = !_isFrontView;
+
+        Log($"[相机切换] {(_isFrontView ? "前视相机（正面观察干涉图样）" : "主相机（实验台全景）")}");
+        ShowHint(_isFrontView
+            ? "📷 正面观察干涉图样\n可清晰看到明暗条纹分布。"
+            : "🔬 返回实验台全景视角");
+    }
+
     public void ResetExperiment()
     {
         Log("[ResetExperiment]");
         _step = ExperimentStep.Setup;
         _paramsValid = false;
         _measuredDeltaX = _error = 0f;
+
+        if (_isFrontView) ToggleFrontViewCamera();
 
         ShowStage2Objects(false);
         ApplyToLUT(defaultWavelength, defaultSlitDistance, defaultScreenDistance);
@@ -242,6 +270,44 @@ public class DoubleSlitSimpleController : MonoBehaviour
         if (parameterManager == null) parameterManager = FindObjectOfType<DoubleSlitParameterManager>();
         if (formulaCalculator == null) formulaCalculator = FindObjectOfType<DoubleSlitFormulaCalculator>();
         if (measurementTool == null) measurementTool = FindObjectOfType<DoubleSlitMeasurementTool>();
+
+        if (mainCamera == null)
+        {
+            mainCamera = Camera.main;
+            if (mainCamera != null) Log($"  AutoFind 主相机: {mainCamera.name}");
+        }
+
+        if (frontViewCamera == null)
+        {
+            var allCams = FindObjectsOfType<Camera>();
+            foreach (var cam in allCams)
+            {
+                if (cam != mainCamera && !cam.name.Contains("UI"))
+                {
+                    frontViewCamera = cam;
+                    frontViewCamera.enabled = false;
+                    Log($"  AutoFind 前视相机: {cam.name} (已禁用)");
+                    break;
+                }
+            }
+            if (frontViewCamera == null && allCams.Length > 1)
+            {
+                foreach (var cam in allCams)
+                {
+                    if (cam != mainCamera)
+                    {
+                        frontViewCamera = cam;
+                        frontViewCamera.enabled = false;
+                        Log($"  AutoFind 前视相机(备选): {cam.name} (已禁用)");
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            frontViewCamera.enabled = false;
+        }
 
         if (waveFieldRenderer == null)
         {

@@ -134,6 +134,25 @@ public class DoubleSlitSimpleTester : MonoBehaviour
             GUILayout.Label($"  理论 Δx = {Ctrl().TheoreticalDeltaX:F3} mm", _sLabel);
             GUI.color = Color.white;
         }
+
+        bool isObserve = hasCtrl && step == DoubleSlitSimpleController.ExperimentStep.Observe;
+        if (isObserve)
+        {
+            bool hasFrontCam = Ctrl().frontViewCamera != null;
+            bool isFront = Ctrl().IsFrontView;
+
+            GUI.enabled = hasFrontCam;
+            GUI.color = hasFrontCam
+                ? (isFront ? new Color(1f, 0.6f, 0.2f) : new Color(0.2f, 0.8f, 1f))
+                : Color.gray;
+            if (Btn(isFront ? "🔙 返回全景视角" : "📷 正面观察干涉图样"))
+            {
+                Ctrl().ToggleFrontViewCamera();
+                Refresh();
+            }
+            GUI.color = Color.white;
+            GUI.enabled = true;
+        }
         GUILayout.Space(4);
 
         bool canMeasure = hasCtrl && step == DoubleSlitSimpleController.ExperimentStep.Observe;
