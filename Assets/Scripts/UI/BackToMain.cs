@@ -5,6 +5,6 @@ public class BackToMain : MonoBehaviour
 {
     public void OnClick()
     {
-        SceneManager.LoadScene("MainScene");
+        SceneManager.LoadScene("MainMenu");
     }
 }
