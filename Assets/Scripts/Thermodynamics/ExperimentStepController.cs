@@ -4,7 +4,7 @@ using UnityEngine;
 public class ExperimentStepController : MonoBehaviour
 {
     // 引用
-    public UIManager uiManager;
+    public Thero.UIManager uiManager;
     public DataCollector dataCollector;
     public CylinderController cylinderController;
     public UIPanel uiPanel;
