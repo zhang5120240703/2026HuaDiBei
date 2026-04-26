@@ -40,31 +40,32 @@ public class UserActionManager
     #region 核心交互逻辑处理
     private void HandleUserAction(UserActionType actionType)
     {
+        var stateCtrl = ExperimentStateManager.Instance;
+        if (stateCtrl == null)
+        {
+            UnityEngine.Debug.LogError("[UserActionManager] ExperimentStateManager.Instance is null! 操作被忽略。");
+            return;
+        }
         switch (actionType)
         {
             case UserActionType.StartExperiment:
-                _stateCtrl.StartExperiment();
+                stateCtrl.StartExperiment();
                 break;
-
             case UserActionType.PauseExperiment:
-                _stateCtrl.PauseExperiment();
+                stateCtrl.PauseExperiment();
                 break;
-
             case UserActionType.ResetExperiment:
-                _stateCtrl.ResetExperiment();
+                stateCtrl.ResetExperiment();
                 _flowCtrl.ResetFlow();
                 break;
-
             case UserActionType.JumpToNextStep:
                 _flowCtrl.NextStep();
                 break;
-
-            case UserActionType.JumpToPrevStep:
+                case UserActionType.JumpToPrevStep:
                 _flowCtrl.PrevStep();
                 break;
-
             case UserActionType.ConfirmParam:
-                _stateCtrl.IsParamValid = true;
+                stateCtrl.IsParamValid = true;
                 break;
         }
     }

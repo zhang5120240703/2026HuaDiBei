@@ -55,5 +55,10 @@ public class ExperimentStateManager : MonoBehaviour
         CurrentRunState = ExperimentRunState.Finished;
         OnRunStateChanged?.Invoke(CurrentRunState);
     }
+
+    internal void ResumeExperiment()
+    {
+        throw new NotImplementedException();
+    }
     #endregion
 }

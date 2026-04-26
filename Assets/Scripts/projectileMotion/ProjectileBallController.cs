@@ -10,6 +10,7 @@ using UnityEngine;
 ///   2. 驱动小球沿轨迹点逐帧移动，模拟平抛/斜抛运动
 ///   3. 用 LineRenderer 实时绘制抛物线轨迹
 ///   4. 监听框架状态事件，正确响应 开始/暂停/重置
+///   5. 在动画结束时触发落地音效和视觉效果
 /// 依赖：
 ///   - SimulationDataBuffer（读取轨迹数据）
 ///   - ExperimentStateManager（监听运行/暂停/重置）
@@ -17,7 +18,10 @@ using UnityEngine;
 ///   - UserActionManager（获取 FlowController 引用）
 /// </summary>
 [RequireComponent(typeof(LineRenderer))]
-[RequireComponent(typeof(AudioSource))] // 音效新增：自动挂载 AudioSource 组件
+[RequireComponent(typeof(AudioSource))]
+/// <summary>
+/// 抛体小球表现控制器，负责小球动画、轨迹线渲染、落地音效等。
+/// </summary>
 public class ProjectileBallController : MonoBehaviour
 {
 
@@ -43,7 +47,7 @@ public class ProjectileBallController : MonoBehaviour
     [Tooltip("是否在实验开始时自动播放动画（true = 进入 Step3_RunSim 后自动播放）")]
     public bool autoPlayOnStep3 = true;
 
-    [Header("小球外观")]
+    [Header("落地动画")]
     [Tooltip("落地时是否播放一次缩放弹跳效果")]
     public bool playLandingBounce = true;
 
@@ -57,15 +61,22 @@ public class ProjectileBallController : MonoBehaviour
 
 
     // ── 私有成员 ─────────────────────────────────────────────────────
-    private LineRenderer _lineRenderer; 
+    // 轨迹线渲染组件
+    private LineRenderer _lineRenderer;
+    // 动画协程句柄
     private Coroutine _animationCoroutine;
+    // 小球初始位置（用于重置）
     private Vector3 _originPosition;     // 记录初始位置（用于重置归位）
 
+    // 框架依赖：实验状态管理器
     private ExperimentStateManager _stateManager;
+    // 框架依赖：实验流程控制器
     private ExperimentFlowController _flowController;
 
+    // 音效组件
     private AudioSource _audioSource;        // 音效新增：AudioSource 引用
 
+    // 动画暂停/播放状态
     private bool _isPaused = false;
     private bool _isPlaying = false;
 
@@ -76,6 +87,9 @@ public class ProjectileBallController : MonoBehaviour
 
     // ── 生命周期 ─────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Unity生命周期：初始化引用和配置
+    /// </summary>
     private void Awake()
     {
         _lineRenderer = GetComponent<LineRenderer>();
@@ -86,6 +100,9 @@ public class ProjectileBallController : MonoBehaviour
         ConfigureAudioSource(); // 音效新增：初始化 AudioSource 配置
     }
 
+    /// <summary>
+    /// Unity生命周期：绑定框架事件
+    /// </summary>
     private void Start()
     {
         // 获取框架引用
@@ -96,6 +113,9 @@ public class ProjectileBallController : MonoBehaviour
         StartCoroutine(LateBindFrameworkEvents());
     }
 
+    /// <summary>
+    /// 等待框架初始化后绑定事件（如流程/状态变化）
+    /// </summary>
     private IEnumerator LateBindFrameworkEvents()
     {
         // 等待一帧，确保 ExperimentCoreEntry.Start() 已执行完毕
@@ -128,6 +148,9 @@ public class ProjectileBallController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 解绑所有事件，防止内存泄漏
+    /// </summary>
     private void OnDestroy()
     {
         // 取消所有事件监听，防止内存泄漏
@@ -146,6 +169,9 @@ public class ProjectileBallController : MonoBehaviour
     /// <summary>
     /// 步骤变化回调：进入 Step3_RunSim 且数据就绪时自动播放
     /// </summary>
+    /// <summary>
+    /// 步骤变化事件回调（如进入Step3自动播放动画）
+    /// </summary>
     private void OnStepChanged(ExperimentStep step)
     {
         if (step == ExperimentStep.Step3_RunSim && autoPlayOnStep3)
@@ -163,6 +189,9 @@ public class ProjectileBallController : MonoBehaviour
 
     /// <summary>
     /// 运行状态变化回调：处理暂停 / 继续 / 重置
+    /// </summary>
+    /// <summary>
+    /// 状态变化事件回调（如暂停/重置/结束）
     /// </summary>
     private void OnRunStateChanged(ExperimentRunState state)
     {
@@ -199,6 +228,9 @@ public class ProjectileBallController : MonoBehaviour
     /// 自动从 SimulationDataBuffer 读取最新轨迹数据。
     /// 若数据为空则打印警告并跳过。
     /// </summary>
+    /// <summary>
+    /// 播放小球动画（沿轨迹点移动并渲染轨迹线）
+    /// </summary>
     public void PlayAnimation()
     {
         if (!SimulationDataBuffer.HasValidData())
@@ -221,6 +253,9 @@ public class ProjectileBallController : MonoBehaviour
     /// <summary>
     /// 暂停动画（保留当前位置）
     /// </summary>
+    /// <summary>
+    /// 暂停动画（保留当前位置）
+    /// </summary>
     public void PauseAnimation()
     {
         if (!_isPlaying) return;
@@ -230,6 +265,9 @@ public class ProjectileBallController : MonoBehaviour
 
     /// <summary>
     /// 恢复已暂停的动画
+    /// </summary>
+    /// <summary>
+    /// 恢复动画（从暂停处继续）
     /// </summary>
     public void ResumeAnimation()
     {
@@ -241,6 +279,9 @@ public class ProjectileBallController : MonoBehaviour
     /// <summary>
     /// 重置小球：回到初始位置，清空轨迹线，停止动画
     /// </summary>
+    /// <summary>
+    /// 重置小球到初始位置并清空轨迹
+    /// </summary>
     public void ResetBall()
     {
         StopAnimationCoroutine();
@@ -251,10 +292,44 @@ public class ProjectileBallController : MonoBehaviour
         Debug.Log("[ProjectileBallController] 小球已重置到初始位置。");
     }
 
+    /// <summary>
+    /// 在不触发仿真的前提下，将小球预览到新的高度位置（Y 轴）。
+    ///
+    /// 调用时机：由 ProjectileExperimentController.AdjustStartHeightByScroll() 在
+    ///           Step1/Step2 阶段调用，为用户提供实时的高度调节视觉反馈。
+    ///
+    /// 安全性：
+    ///   • 动画播放中（_isPlaying）时忽略调用，避免与协程位置争抢
+    ///   • 只改变 Y 分量，X/Z 保持原始 _originPosition，确保球不偏移水平初始位置
+    ///   • 同时更新 _originPosition.y，使 ResetBall() 之后仍能回到正确高度
+    /// </summary>
+    /// <param name="newY">目标高度（世界坐标 Y，单位：米）</param>
+    public void SetPreviewHeight(float newY)
+    {
+        // 动画运行中不响应：协程驱动位置，贸然修改会造成跳帧
+        if (_isPlaying)
+        {
+            Debug.LogWarning("[ProjectileBallController] 动画播放中，忽略 SetPreviewHeight 调用。");
+            return;
+        }
+
+        // 仅更新 Y 分量，X/Z 保持 _originPosition 的值
+        Vector3 preview = new Vector3(_originPosition.x, newY, _originPosition.z);
+        transform.position = preview;
+
+        // 同步 _originPosition.y，保证 ResetBall() 能回到本次预览高度
+        _originPosition.y = newY;
+
+        Debug.Log($"[ProjectileBallController] 小球预览高度 → Y = {newY:F2} m");
+    }
+
     // ── 核心动画协程 ─────────────────────────────────────────────────
 
     /// <summary>
     /// 核心：驱动小球沿三维轨迹点序列逐步移动，同步绘制轨迹线
+    /// </summary>
+    /// <summary>
+    /// 动画主协程：小球沿轨迹点移动，轨迹线同步高亮
     /// </summary>
     private IEnumerator AnimateAlongTrajectory(List<Vector3> points)
     {
@@ -274,7 +349,7 @@ public class ProjectileBallController : MonoBehaviour
         _originPosition = points[0];
         transform.position = points[0];
 
-        float waitTime = animationTimeStep / Mathf.Max(playbackSpeed, 0.01f);
+        float waitTime = animationTimeStep / Mathf.Max(playbackSpeed, 0.01f);//倍速控制
 
         for (int i = 0; i < validPointCount; i++)
         {
@@ -300,6 +375,9 @@ public class ProjectileBallController : MonoBehaviour
 
     /// <summary>
     /// 配置 LineRenderer 基础属性
+    /// </summary>
+    /// <summary>
+    /// 配置轨迹线渲染器参数和渐变色
     /// </summary>
     private void ConfigureLineRenderer()
     {
@@ -333,6 +411,9 @@ public class ProjectileBallController : MonoBehaviour
     /// <summary>
     /// 更新轨迹线颜色进度（已走过的轨迹段完全不透明，未走的轨迹段半透明）
     /// </summary>
+    /// <summary>
+    /// 根据动画进度实时调整轨迹线颜色渐变
+    /// </summary>
     private void UpdateTrailProgress(List<Vector3> points, int currentIndex)
     {
         // 用渐变色区分已走/未走，使用Gradient避免每帧new Color
@@ -359,6 +440,9 @@ public class ProjectileBallController : MonoBehaviour
     /// <summary>
     /// 清空轨迹线
     /// </summary>
+    /// <summary>
+    /// 清空轨迹线
+    /// </summary>
     private void ClearTrail()
     {
         _lineRenderer.positionCount = 0;
@@ -368,6 +452,9 @@ public class ProjectileBallController : MonoBehaviour
 
     /// <summary>
     /// 配置 AudioSource 基础属性（不循环、不自启、设置初始音量）
+    /// </summary>
+    /// <summary>
+    /// 配置音效组件参数
     /// </summary>
     private void ConfigureAudioSource()
     {
@@ -381,6 +468,9 @@ public class ProjectileBallController : MonoBehaviour
     /// <summary>
     /// 播放落地音效（使用 PlayOneShot 避免打断其他音效）
     /// </summary>
+    /// <summary>
+    /// 播放落地音效
+    /// </summary>
     private void PlayLandingSound()
     {
         if (_audioSource == null || landingSound == null) return;
@@ -392,6 +482,9 @@ public class ProjectileBallController : MonoBehaviour
 
     /// <summary>
     /// 动画播放完毕时调用
+    /// </summary>
+    /// <summary>
+    /// 动画播放完毕时回调（触发音效、弹跳、通知状态）
     /// </summary>
     private void OnAnimationFinished()
     {
@@ -412,6 +505,9 @@ public class ProjectileBallController : MonoBehaviour
 
     /// <summary>
     /// 落地弹跳缩放效果（纯视觉，不影响物理数据）
+    /// </summary>
+    /// <summary>
+    /// 落地弹跳视觉效果（缩放动画）
     /// </summary>
     private IEnumerator LandingBounceEffect()
     {
@@ -449,6 +545,9 @@ public class ProjectileBallController : MonoBehaviour
 
     // ── 内部工具 ─────────────────────────────────────────────────────
 
+    /// <summary>
+    /// 停止动画协程
+    /// </summary>
     private void StopAnimationCoroutine()
     {
         if (_animationCoroutine != null)

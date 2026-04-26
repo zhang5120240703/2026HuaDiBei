@@ -50,7 +50,7 @@ public class ProjectileExperimentController : MonoBehaviour
 
     [Tooltip("仰角（°），0 = 平抛，45 = 最优斜抛")]
     [Range(0f, 90f)]
-    public float defaultAngle = 45f;
+    public float defaultAngle = 0f;
 
     [Tooltip("水平发射方向（XZ 平面，自动忽略 Y 分量）")]
     public Vector3 defaultDirection = Vector3.forward;
@@ -60,7 +60,7 @@ public class ProjectileExperimentController : MonoBehaviour
 
     [Tooltip("物理计算时间步长（s），越小越精确，建议 0.01 ~ 0.05")]
     public float defaultTimeStep = 0.02f;
-
+    // 注意：时间步长过大可能导致轨迹不平滑，甚至错过碰撞点；过小则计算量增加，可能导致性能问题。
     [Tooltip("最大模拟时长（s），超过此时间停止计算")]
     public float defaultTotalTime = 5f;
 
@@ -108,6 +108,13 @@ public class ProjectileExperimentController : MonoBehaviour
     /// <summary>流程跳转失败或其他流程错误，string = 错误描述</summary>
     public event Action<string> OnFlowError;
 
+    /// <summary>
+    /// 滚轮调整起点高度后触发，float = 新的 Y 坐标（已夹到合法范围）。
+    /// UI 层订阅此事件以同步输入框显示；ProjectileBallController 通过
+    /// SetPreviewHeight 同步小球预览位置（由本类内部直接调用，不通过事件）。
+    /// </summary>
+    public event Action<float> OnStartHeightChanged;
+
     // ══════════════════════════════════════════════════════════════════
     // 运行时参数（由 UI 通过 SetParam 写入）
     // ══════════════════════════════════════════════════════════════════
@@ -147,6 +154,12 @@ public class ProjectileExperimentController : MonoBehaviour
 
     // 是否正处于 Step3 仿真运行阶段（用于 Pause/Resume 时额外控制球的动画）
     private bool _inStep3Sim;
+
+    // ── 滚轮高度调节常量 ─────────────────────────────────────────────
+    /// <summary>起点高度最小值（m），必须高于地面（GroundY = 0）</summary>
+    private const float HeightScrollMin = 0.1f;
+    /// <summary>起点高度最大值（m），防止调节过高脱出实验场景</summary>
+    private const float HeightScrollMax = 50f;
 
     // ══════════════════════════════════════════════════════════════════
     // 生命周期
@@ -335,7 +348,6 @@ public class ProjectileExperimentController : MonoBehaviour
     }
 
     // ─── 通用控制接口（任意阶段均有效）──────────────────────────────
-
     /// <summary>
     /// [任意阶段 · UI调用] 暂停实验。
     /// - Step1/2/4/5（等待用户输入阶段）：即使用户已点击"确认"，流程也不会推进
@@ -350,14 +362,17 @@ public class ProjectileExperimentController : MonoBehaviour
         if (_inStep3Sim)
             ballController?.PauseAnimation();
 
-        // 通知状态管理器（供其他系统监听）
-        if (_stateManager.CurrentRunState == ExperimentRunState.Running)
-            _stateManager.PauseExperiment();
+        // ★ Bug Fix: 暂停时不改变 StateManager 状态。
+        // 原框架 ExperimentStateManager 缺少 ResumeExperiment() 方法，
+        // 如果在暂停时将状态改为 Paused，恢复后状态机无法回到 Running，
+        // 导致动画播放完毕时也无法转移至 Finished，WaitForCondition 将永远卡住。
+        // 暂停的语义已通过 _isPaused 和 ballController.PauseAnimation() 保证。
+        // if (_stateManager.CurrentRunState == ExperimentRunState.Running)
+        //     _stateManager.PauseExperiment();
 
         OnPaused?.Invoke();
         Debug.Log("[ExperimentController] ⏸ 实验已暂停。");
     }
-
     /// <summary>
     /// [任意阶段 · UI调用] 恢复已暂停的实验。
     /// Step3 阶段会同时恢复小球动画。
@@ -386,6 +401,41 @@ public class ProjectileExperimentController : MonoBehaviour
         // 强制解除暂停，让等待中的协程能够检测到 reset 标志并安全退出
         _isPaused = false;
         Debug.Log("[ExperimentController] 🔄 收到重置请求，正在中断当前流程...");
+    }
+
+    // ─── 滚轮高度调节接口 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// [Step1/Step2 · UI调用] 通过鼠标滚轮调节小球发射起点的 Y 坐标。
+    ///
+    /// 调用方（TempExperimentUI.Update）负责：
+    ///   • 检测 Input.GetAxis("Mouse ScrollWheel")
+    ///   • 乘以灵敏度系数后传入 delta
+    ///   • 只在 Step1/Step2 阶段调用（步骤过滤在 UI 侧完成）
+    ///
+    /// 本方法负责：
+    ///   1. 将新高度夹到 [HeightScrollMin, HeightScrollMax]
+    ///   2. 写入 _startPosition.y
+    ///   3. 触发 OnStartHeightChanged 事件（UI 同步输入框显示）
+    ///   4. 调用 ballController.SetPreviewHeight() 同步小球预览位置
+    /// </summary>
+    /// <param name="delta">高度增量（米），正值向上，负值向下</param>
+    public void AdjustStartHeightByScroll(float delta)
+    {
+        float newY = Mathf.Clamp(_startPosition.y + delta, HeightScrollMin, HeightScrollMax);
+
+        // 若已经到达边界且增量方向相同，直接跳过（避免无意义触发）
+        if (Mathf.Approximately(newY, _startPosition.y)) return;
+
+        _startPosition.y = newY;
+
+        // 通知 UI 同步输入框
+        OnStartHeightChanged?.Invoke(newY);
+
+        // 通知小球控制器更新预览位置（视觉反馈，不触发仿真）
+        ballController?.SetPreviewHeight(newY);
+
+        Debug.Log($"[ExperimentController] 🖱️ 滚轮调整起点高度 → Y = {newY:F2} m");
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -500,11 +550,7 @@ public class ProjectileExperimentController : MonoBehaviour
 
         OnStepEntered?.Invoke(ExperimentStep.Step3_RunSim);
 
-        // ★ Bug4 Fix: 用重试循环取代"在 DoStep3 内嵌 Step2 逻辑后 yield break"的破坏性写法。
-        //   原写法：失败→在 DoStep3 内滚回 Step2→yield break，但主循环在 DoStep3 返回后
-        //   直接进入 DoStep4，而 _flowController.CurrentStep 仍为 Step3，导致步骤错位。
-        //   新写法：循环直到计算成功或重置，失败时滚回 Step2 并等待重新确认，
-        //   所有步骤跳转都在循环内维护一致，不打断主循环节奏。
+
         List<Vector3> trajectoryPoints = null;
 
         while (true)
@@ -519,7 +565,7 @@ public class ProjectileExperimentController : MonoBehaviour
             if (trajectoryPoints != null && trajectoryPoints.Count > 0)
                 break; // 计算成功，退出重试循环
 
-            // ── 计算失败：退回 Step2 重新设参数 ─────────────────────
+            // ── 计算失败：退回 Step2 重新设参数 ─────────────────────---
             string err = "物理仿真失败：参数不合法或起点低于地面，请重新设置参数。";
             OnParamError?.Invoke(err);
             Debug.LogError($"[ExperimentController] {err}");
@@ -766,10 +812,12 @@ public class ProjectileExperimentController : MonoBehaviour
  ║ Step1 准备   ║ ConfirmPrepare()     ║ OnStepEntered(Step1_Prepare)      ║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
  ║ Step2 参数   ║ SetParam(...)        ║ OnStepEntered(Step2_SetParam)     ║
- ║              ║ ConfirmParam()       ║ OnParamLoaded(v,θ,dir,pos,dt,T)   ║
+ ║ (滚轮调节小球高度
+   不适合用协程，在UI
+侧通过update实现)             ║ ConfirmParam()       ║ OnParamLoaded(v,θ,dir,pos,dt,T)   ║
  ║              ║                      ║ OnParamError(errorMsg)            ║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
- ║ Step3 仿真   ║ （无需确认，自动）   ║ OnStepEntered(Step3_RunSim)       ║
+ ║ Step3 仿真   ║ （无需确认，自动）   ║ OnStepEntered(Step3_RunSim)          ║
  ║              ║                      ║ OnSimulationReady(snapshot,points)║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
  ║ Step4 观察   ║ ConfirmObserved()    ║ OnStepEntered(Step4_Observe)      ║
@@ -786,10 +834,12 @@ public class ProjectileExperimentController : MonoBehaviour
  挂载方式：
    将本脚本挂载到场景中任意 GameObject（建议挂到 ExperimentCoreEntry 同一个对象）。
    ballController 可留空，脚本会自动 FindObjectOfType 查找。
-
+/*
  ExperimentStateManager 的 Resume 说明：
-   原框架 ExperimentStateManager 无 ResumeExperiment() 方法，
-   本脚本通过 ballController.ResumeAnimation() 直接恢复动画，
-   同时 _isPaused 标志解除后 WaitForCondition 继续推进流程，
-   无需依赖 StateManager 的 Running 状态做恢复。
+   原框架 ExperimentStateManager 无 ResumeExperiment() 方法。
+   如果在 RequestPause() 中调用 PauseExperiment() 将状态置为 Paused，
+   恢复时由于无法调用 ResumeExperiment()，状态将卡在 Paused，
+   导致小球落地后无法触发状态转移至 Finished，WaitForCondition 死循环。
+   因此，本脚本在暂停时不调用 PauseExperiment()，仅通过 ballController.PauseAnimation() 暂停动画，
+   并由 _isPaused 标志控制流程挂起。小球落地后 StateManager 仍可正常从 Running 转移至 Finished。
 */
