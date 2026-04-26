@@ -43,10 +43,20 @@ public class UIManager : MonoBehaviour
     }
 
     // UI2 点开始实验：跳去对应场景
+    // 在 UIManager.cs 的 StartExperiment() 方法里，LoadScene 之前加入：
+
     public void StartExperiment()
     {
+        // ── 新增：写入桥接器 ────────────────────
+        if (ExperimentResultBridge.Instance != null)
+        {
+            ExperimentResultBridge.Instance.experimentName = selectedScene;
+            ExperimentResultBridge.Instance.startTime = Time.time;
+            ExperimentResultBridge.Instance.Clear();  // 清空上次数据
+        }
+        // ─────────────────────────────────────────
+
         StartCoroutine(LoadToScene());
-        //SceneManager.LoadScene(selectedScene);
     }
 
     // 从实验场景回来 → 显示总结 UI4
