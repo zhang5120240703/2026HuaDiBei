@@ -20,7 +20,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     private float lastVolume; // 上一次记录的体积
     private float volumeChangeRate; // 体积变化率
     private float lastChangeTime; // 上一次变化时间
-    //
+    
     private const float sensitivity = 0.001f; // 鼠标移动转换为活塞移动的灵敏度
     private float dragStartThreshold = 5f; // 像素级阈值，防止点击也触发移动
     private bool pointerDown = false; // 标记是否按下但尚未达到拖动阈值
@@ -37,18 +37,12 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     public System.Action<float> OnVolumeChanged;
     public System.Action<bool> OnVolumeRangeExceeded; // 当体积超出范围时触发
 
-
-
     //平滑移动参数
     private float targetPistonY;// 目标活塞位置
     private float smoothVelocity; // 平滑移动的速度
     public float smoothTime = 0.1f; // 平滑移动的时间常数
 
-
-
     private IdealGasSimulation.ProcessType currentProcess;
-
-
 
     private void Start()
     {
@@ -308,14 +302,6 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
 
     }
 
-
-
-    #region 数据接口
-    // 获取当前体积变化率
-    public float GetVolumeChangeRate()
-    {
-        return volumeChangeRate;
-    }
     
     // 检查体积是否稳定
     public bool IsVolumeStable()
@@ -323,20 +309,10 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         return volumeChangeRate < 0.01f; // 变化小于0.01L/秒视为稳定
     }
     
-    // 获取体积范围
-    public float GetMinVolume()
-    {
-        return minHeight;
-    }
-    
-    public float GetMaxVolume()
-    {
-        return maxHeight;
-    }
 
     public bool GetPistonDragged()
     {
         return canDrag;
     }
-    #endregion
+
 }

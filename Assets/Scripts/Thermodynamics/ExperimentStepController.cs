@@ -4,7 +4,7 @@ using UnityEngine;
 public class ExperimentStepController : MonoBehaviour
 {
     // 引用
-    public UIManager uiManager;
+    public UI_Manager uiManager;
     public DataCollector dataCollector;
     public CylinderController cylinderController;
     public UIPanel uiPanel;
@@ -42,25 +42,20 @@ public class ExperimentStepController : MonoBehaviour
         
         // 更新UI显示
         int step = 0;
-        string stageName = "";
         
         switch (stage)
         {
             case ExperimentStage.Preparation:
                 step = 1;
-                stageName = "准备阶段";
                 break;
             case ExperimentStage.Confirmation:
                 step = 2;
-                stageName = "确认实验过程";
                 break;
             case ExperimentStage.DataCollection:
                 step = 3;
-                stageName = "数据采集";
                 break;
             case ExperimentStage.DataAnalysis:
                 step = 4;
-                stageName = "数据分析";
                 break;
         }
         
@@ -163,18 +158,18 @@ public class ExperimentStepController : MonoBehaviour
     }
     
     // 检查操作是否正确
-    public bool IsOperationCorrect()
-    {
-        switch (currentStage)
-        {
-            case ExperimentStage.DataCollection:
-                // 检查是否在合理的体积范围内操作
-                float currentVolume = IdealGasSimulation.Instance.GetVolume();
-                return currentVolume >= IdealGasSimulation.Instance.GetMinVolume() && currentVolume <= IdealGasSimulation.Instance.GetMaxVolume();
-            default:
-                return true;
-        }
-    }
+    //public bool IsOperationCorrect()
+    //{
+    //    switch (currentStage)
+    //    {
+    //        case ExperimentStage.DataCollection:
+    //            // 检查是否在合理的体积范围内操作
+    //            float currentVolume = IdealGasSimulation.Instance.GetVolume();
+    //            return currentVolume >= IdealGasSimulation.Instance.GetMinVolume() && currentVolume <= IdealGasSimulation.Instance.GetMaxVolume();
+    //        default:
+    //            return true;
+    //    }
+    //}
 
 
 }

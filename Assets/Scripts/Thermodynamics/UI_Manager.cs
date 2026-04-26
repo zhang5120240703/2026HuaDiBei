@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-public class UIManager : MonoBehaviour
+public class UI_Manager : MonoBehaviour
 {
     // 引用
     public CylinderController cylinderController;
@@ -90,11 +90,7 @@ public class UIManager : MonoBehaviour
     }
 
     
-    // 获取当前实验步骤
-    public int GetCurrentStep()
-    {
-        return uiPanel.GetCurrentStep();
-    }
+
     
     // 设置实验步骤
     public void SetStep(int step)

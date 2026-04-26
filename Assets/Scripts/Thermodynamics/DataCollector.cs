@@ -37,7 +37,9 @@ public class DataCollector : MonoBehaviour
     // 分析结果
     private float averagePVProduct;
     private float pvStandardDeviation;
-    private float averageErrorPercentage;
+    private float PVAverageErrorPercentage;//PV乘积平均误差百分比
+    private float VTAverageErrorPercentage;//V/T平均误差百分比
+    private float PTAverageErrorPercentage;//P/T平均误差百分比
     private bool isConfirm=false;
 
     // 事件
@@ -226,16 +228,16 @@ public class DataCollector : MonoBehaviour
         averagePVProduct = sumPV / dataPoints.Count;
         float variance = (sumPVSquared / dataPoints.Count) - (averagePVProduct * averagePVProduct);
         pvStandardDeviation = Mathf.Sqrt(variance);
-        
+
         // 计算平均误差
-        averageErrorPercentage = 0;
+        PVAverageErrorPercentage = 0;
         float totalError = 0;
         foreach (var point in dataPoints)
         {
              totalError=totalError+ Mathf.Abs((point.pvProduct - averagePVProduct) / averagePVProduct) * 100f;
         }
 
-        averageErrorPercentage = totalError / dataPoints.Count;
+        PVAverageErrorPercentage = totalError / dataPoints.Count;
         
         // 触发分析完成事件
         OnAnalysisCompleted?.Invoke();
@@ -249,7 +251,7 @@ public class DataCollector : MonoBehaviour
         lastVolumeChangeTime = Time.time;
         averagePVProduct = 0;
         pvStandardDeviation = 0;
-        averageErrorPercentage = 0;
+        PVAverageErrorPercentage = 0;
     }
 
 
@@ -258,10 +260,10 @@ public class DataCollector : MonoBehaviour
     // 检查是否验证了玻意耳定律
     public bool IsBoyleLawVerified()
     {
-        return averageErrorPercentage < 3.0f; // 误差控制在3%以内
+        return PVAverageErrorPercentage < 3.0f; // 误差控制在3%以内
     }
     
-    // 检查是否验证了盖-吕萨克定律
+    // 检查是否验证了盖-吕萨克定律(等压)
     public bool IsCharlesLawVerified()
     {
         if (dataPoints.Count < 2) return false;
@@ -283,10 +285,11 @@ public class DataCollector : MonoBehaviour
 
         }
         averageError = sumError / dataPoints.Count;
+        VTAverageErrorPercentage = averageError;
         return averageError < 3.0f;
     }
     
-    // 检查是否验证了查理定律
+    // 检查是否验证了查理定律（等容）
     public bool IsGayLussacLawVerified()
     {
         if (dataPoints.Count < 2) return false;
@@ -308,6 +311,7 @@ public class DataCollector : MonoBehaviour
 
         }
         averageError= sumError / dataPoints.Count;
+        PTAverageErrorPercentage = averageError;
         return averageError < 3.0f;
     }
 
@@ -333,9 +337,19 @@ public class DataCollector : MonoBehaviour
     
     public float GetAverageErrorPercentage()
     {
-        return averageErrorPercentage;
+        return PVAverageErrorPercentage;
     }
-    
+
+
+    public float GetVTAverageErrorPercentage()
+    {
+        return VTAverageErrorPercentage;
+    }
+
+    public float GetPTAverageErrorPercentage()
+    {
+        return PTAverageErrorPercentage;
+    }
     // 获取数据点数量
     public int GetDataPointCount()
     {
