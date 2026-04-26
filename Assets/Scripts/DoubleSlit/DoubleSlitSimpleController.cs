@@ -17,17 +17,12 @@ public class DoubleSlitSimpleController : MonoBehaviour
     public DoubleSlitFormulaCalculator formulaCalculator;
     public DoubleSlitMeasurementTool measurementTool;
 
-    [Header("── 默认参数 ──")]
-    [Range(380f, 780f)] public float defaultWavelength = 632.8f;
-    [Range(0.01f, 1f)] public float defaultSlitDistance = 0.47f;
-    [Range(0.1f, 5f)] public float defaultScreenDistance = 3.8f;
-
     [Header("── 相机切换 ──")]
     public Camera mainCamera;
     public Camera frontViewCamera;
     private bool _isFrontView = false;
 
-    public bool IsFrontView => _isFrontView;
+    public bool IsFrontView => _isFrontView;// 供外部查询当前是否为前视相机视角
 
     public enum ExperimentStep { Setup, Observe, Measure }
     private ExperimentStep _step = ExperimentStep.Setup;
@@ -35,14 +30,16 @@ public class DoubleSlitSimpleController : MonoBehaviour
     private float _measuredDeltaX = 0f;
     private float _theoreticalDx = 0f;
     private float _error = 0f;
-
+    // 预先计算Shader属性ID，避免运行时字符串查找开销
     static readonly int s_Emission = Shader.PropertyToID("_EmissionColor");
-
+    // 供外部查询当前实验阶段、参数有效性、测量结果等状态
     public ExperimentStep CurrentStep => _step;
     public bool IsParametersValid => _paramsValid;
     public float MeasuredDeltaX => _measuredDeltaX;
+    // 理论值和误差优先从 formulaCalculator 获取，若其存在则覆盖本地计算结果，确保一致性
     public float TheoreticalDeltaX
         => formulaCalculator != null ? formulaCalculator.TheoreticalDeltaX : _theoreticalDx;
+    // 同理，误差也优先使用 formulaCalculator 的计算结果（如果存在），以保持与公式计算器的同步
     public float CurrentError
         => formulaCalculator != null ? formulaCalculator.CurrentError : _error;
 
@@ -56,17 +53,16 @@ public class DoubleSlitSimpleController : MonoBehaviour
         Log($"  interferenceRenderer = {(interferenceRenderer != null ? "✓ " + interferenceRenderer.name : "✗ 未找到!")}");
 
         ShowStage2Objects(false);
-        ApplyToLUT(defaultWavelength, defaultSlitDistance, defaultScreenDistance);
-
         if (benchManager != null)
             benchManager.onExperimentIncorrect.AddListener(OnBenchSetupInvalid);
 
         ShowHint("🔬 双缝干涉实验\n① 设置参数 ② 确认参数→观察条纹 ③ 测量");
     }
 
-    public void SetParameters(float wavelength, float slitDistance, float screenDistance)
+    public void SetParameters(float wavelength, float slitDistance)
     {
-        Log($"[SetParameters] λ={wavelength} d={slitDistance} L={screenDistance}");
+        float screenDistance = GetActualScreenDistance();
+        Log($"[SetParameters] λ={wavelength} d={slitDistance} L={screenDistance:F3}(自动)");
         if (lutGenerator == null) { Log("  ✗ lutGenerator 为空!"); ShowHint("⚠ 未找到 LUT 生成器！"); return; }
 
         _paramsValid = (parameterManager != null)
@@ -80,7 +76,7 @@ public class DoubleSlitSimpleController : MonoBehaviour
         ApplyToLUT(wavelength, slitDistance, screenDistance);
 
         ShowHint(_paramsValid
-            ? $"✅ 参数已设置\n  λ={wavelength:F0}nm  d={slitDistance:F3}mm  L={screenDistance:F2}m\n  理论 Δx = {_theoreticalDx:F3} mm\n\n点击「确认参数」进入观察阶段"
+            ? $"✅ 参数已设置\n  λ={wavelength:F0}nm  d={slitDistance:F3}mm  L={screenDistance:F2}m(实测)\n  理论 Δx = {_theoreticalDx:F3} mm\n\n点击「确认参数」进入观察阶段"
             : "⚠ 参数超出范围！\n  波长 380–780nm / 缝距 0.01–1mm / 屏距 0.1–10m");
     }
 
@@ -108,16 +104,16 @@ public class DoubleSlitSimpleController : MonoBehaviour
         _step = ExperimentStep.Observe;
         Log("  → _step = Observe, 调用 ShowStage2Objects(true)");
 
-        ClearInterferenceRendererEmission();
+        ClearInterferenceRendererEmission();// 确保干涉图案初始时不受发光影响，避免残留亮斑干扰观察
         ShowStage2Objects(true);
 
-        VerifyLUTApplied();
+        VerifyLUTApplied();// 调试输出当前LUT应用状态，帮助排查干涉图样不显示的问题
 
         Log("  → ShowStage2Objects 完成");
         ShowHint("👁 干涉图样已显示！\n请观察明暗交替的条纹。");
     }
 
-    private void VerifyLUTApplied()
+    private void VerifyLUTApplied()//调试
     {
         if (interferenceRenderer == null) { Log("  [验证] interferenceRenderer 为空!"); return; }
         var mat = interferenceRenderer.sharedMaterial;
@@ -140,11 +136,12 @@ public class DoubleSlitSimpleController : MonoBehaviour
         Log($"[StartMeasurement] _step={_step}");
         if (_step != ExperimentStep.Observe) { ShowHint("⚠ 请先完成观察阶段！"); return; }
         _step = ExperimentStep.Measure;
+        if (measurementTool != null) measurementTool.StartMeasurement();
         Log("  → _step = Measure");
-        ShowHint("📏 测量阶段\n请测量相邻亮纹间距 Δx (mm)。");
+        ShowHint("📏 测量阶段\n切换到正面视角，使用读数显微镜测量条纹间距。");
     }
 
-    public void RecordMeasurement(float deltaX)
+    public void RecordMeasurement(float deltaX)//UI调用，传入测量值
     {
         Log($"[RecordMeasurement] deltaX={deltaX} _step={_step}");
         if (_step != ExperimentStep.Measure) { ShowHint("⚠ 请先进入测量阶段！"); return; }
@@ -187,8 +184,11 @@ public class DoubleSlitSimpleController : MonoBehaviour
 
         if (_isFrontView) ToggleFrontViewCamera();
 
+        if (measurementTool != null) measurementTool.StopMeasurement();
+
+        if (benchManager != null) benchManager.ResetAll();
+
         ShowStage2Objects(false);
-        ApplyToLUT(defaultWavelength, defaultSlitDistance, defaultScreenDistance);
         _paramsValid = false;
 
         ShowHint("🔄 已重置！\n请重新设置参数后点击「确认参数」。");
@@ -260,6 +260,13 @@ public class DoubleSlitSimpleController : MonoBehaviour
 
         if (formulaCalculator != null)
             formulaCalculator.CalculateTheoreticalDeltaX(wl, L, d);
+    }
+
+    private float GetActualScreenDistance()
+    {
+        if (benchManager == null || benchManager.doubleSlit == null || benchManager.screen == null)
+            return 1f;
+        return benchManager.GetDistanceAlongBench(benchManager.doubleSlit, benchManager.screen);
     }
 
     private void AutoFind()
@@ -349,13 +356,4 @@ public class DoubleSlitSimpleController : MonoBehaviour
     }
 
     private void Log(string msg) => Debug.Log("[双缝实验] " + msg);
-
-#if UNITY_EDITOR
-    void OnValidate()
-    {
-        defaultWavelength = Mathf.Clamp(defaultWavelength, 380f, 780f);
-        defaultSlitDistance = Mathf.Clamp(defaultSlitDistance, 0.01f, 1f);
-        defaultScreenDistance = Mathf.Clamp(defaultScreenDistance, 0.1f, 10f);
-    }
-#endif
 }

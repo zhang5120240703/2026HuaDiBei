@@ -389,10 +389,11 @@ Transform:
   m_GameObject: {fileID: 189980872}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.83, y: 5.8, z: -27.37}
+  m_LocalPosition: {x: -10.83, y: 5.8, z: -25.56}
   m_LocalScale: {x: 0.6, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1311178104}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &189980877
@@ -506,7 +507,7 @@ Transform:
   m_GameObject: {fileID: 227151299}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.92, y: 5.8, z: -18.75}
+  m_LocalPosition: {x: -10.829, y: 5.8, z: -18.983}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -732,7 +733,8 @@ GameObject:
   m_Component:
   - component: {fileID: 822473368}
   - component: {fileID: 822473370}
-  - component: {fileID: 822473369}
+  - component: {fileID: 822473373}
+  - component: {fileID: 822473371}
   m_Layer: 0
   m_Name: Experiment
   m_TagString: Untagged
@@ -755,42 +757,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &822473369
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 822473367}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3589950632841ed4b94c1cb32c979730, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  benchManager: {fileID: 1575472554}
-  hintText: {fileID: 0}
-  hintKeepTime: 4
-  hintFadeTime: 0.6
-  dragModeText: {fileID: 0}
-  controlHintText: {fileID: 0}
-  coordPanel: {fileID: 0}
-  coordText: {fileID: 0}
-  stepIcons: []
-  stepLabels: []
-  stepPendingColor: {r: 0.45, g: 0.45, b: 0.45, a: 0.8}
-  stepCompleteColor: {r: 0.2, g: 1, b: 0.35, a: 1}
-  stepErrorColor: {r: 1, g: 0.25, b: 0.25, a: 1}
-  autoAlignButton: {fileID: 0}
-  resetButton: {fileID: 0}
-  validateButton: {fileID: 0}
-  snapToggle: {fileID: 0}
-  resultPanel: {fileID: 0}
-  resultTitle: {fileID: 0}
-  resultDetail: {fileID: 0}
-  resultPanelBg: {fileID: 0}
-  resultCloseButton: {fileID: 0}
-  resultCorrectColor: {r: 0.1, g: 0.45, b: 0.1, a: 0.88}
-  resultErrorColor: {r: 0.45, g: 0.1, b: 0.1, a: 0.88}
 --- !u!114 &822473370
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -827,6 +793,38 @@ MonoBehaviour:
   resultCloseButton: {fileID: 0}
   resultCorrectColor: {r: 0.1, g: 0.45, b: 0.1, a: 0.88}
   resultErrorColor: {r: 0.45, g: 0.1, b: 0.1, a: 0.88}
+--- !u!114 &822473371
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 822473367}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c78ebc0193736454fb119b8cf5ad6143, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lightSource: {fileID: 0}
+  singleSlit: {fileID: 0}
+  doubleSlit: {fileID: 0}
+--- !u!114 &822473373
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 822473367}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0737dbe276368db49938aafb4a1fc40d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  errorThreshold: 8
+  theoreticalDeltaX: 0
+  measuredDeltaX: 0
+  currentError: 0
+  isErrorAcceptable: 0
 --- !u!1 &864599842
 GameObject:
   m_ObjectHideFlags: 0
@@ -1037,6 +1035,122 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1072539300}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!21 &1141152210
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: WaveField2D (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
+  m_Shader: {fileID: 4800000, guid: e515f8efecf01b0488802f780fe086f7, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Aspect: 3.696016
+    - _Brightness: 1.42
+    - _BumpScale: 1
+    - _Cutoff: 0.5
+    - _DetailNormalMapScale: 1
+    - _DstBlend: 0
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _Metallic: 0
+    - _Mode: 0
+    - _OcclusionStrength: 1
+    - _Parallax: 0.02
+    - _ShowPhase: 0
+    - _Slit1Y: 0.544
+    - _Slit2Y: 0.456
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _TimeScale: 0.93
+    - _UVSec: 0
+    - _VisualK: 42.499718
+    - _ZWrite: 1
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _WaveColor: {r: 1, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []
 --- !u!1 &1311178099
 GameObject:
   m_ObjectHideFlags: 0
@@ -1074,7 +1188,11 @@ MonoBehaviour:
   animationSpeed: 0.93
   brightness: 1.42
   phaseWaveMode: 0
-  slitSepToPlaneHeightRatio: 0.094
+  slitSepToPlaneHeightRatio: 0.088
+  autoFitDistance: 1
+  doubleSlitTransform: {fileID: 189980876}
+  screenTransform: {fileID: 1812360455}
+  manualScale: 0.6
 --- !u!64 &1311178101
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1117,7 +1235,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1699044913}
+  - {fileID: 1141152210}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1156,11 +1274,11 @@ Transform:
   m_GameObject: {fileID: 1311178099}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: -0, z: 0.7071068, w: 0}
-  m_LocalPosition: {x: -10.96, y: 5.88, z: -21.71}
-  m_LocalScale: {x: 10.700001, y: 2.5000017, z: 1}
+  m_LocalPosition: {x: 0.02499898, y: 0, z: 4.620001}
+  m_LocalScale: {x: 9.240048, y: 2.5000021, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 189980876}
   m_LocalEulerAnglesHint: {x: 0, y: 90, z: 180}
 --- !u!1 &1317708251
 GameObject:
@@ -1404,8 +1522,8 @@ MonoBehaviour:
   snapRadius: 0.5
   snapPosLight: {x: -10.83, y: 5.8, z: -37.99}
   snapPosSingle: {x: -10.83, y: 5.8, z: -32.17}
-  snapPosDouble: {x: -10.83, y: 5.8, z: -27.37}
-  snapPosScreen: {x: -10.83, y: 5.8, z: -16.32}
+  snapPosDouble: {x: -10.83, y: 5.8, z: -25.53}
+  snapPosScreen: {x: -10.8, y: 5.8, z: -16.32}
   heightTolerance: 0.08
   xAlignTolerance: 0.3
   orderMinGap: 0.12
@@ -1432,7 +1550,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1575472549}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c78ebc0193736454fb119b8cf5ad6143, type: 3}
   m_Name: 
@@ -1449,10 +1567,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1614088845}
-  - component: {fileID: 1614088844}
   - component: {fileID: 1614088847}
   - component: {fileID: 1614088846}
-  - component: {fileID: 1614088848}
   m_Layer: 0
   m_Name: TestUI
   m_TagString: Untagged
@@ -1460,42 +1576,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1614088844
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1614088843}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3589950632841ed4b94c1cb32c979730, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  benchManager: {fileID: 1575472554}
-  hintText: {fileID: 0}
-  hintKeepTime: 4
-  hintFadeTime: 0.5
-  dragModeText: {fileID: 0}
-  controlHintText: {fileID: 0}
-  coordPanel: {fileID: 0}
-  coordText: {fileID: 0}
-  stepIcons: []
-  stepLabels: []
-  stepPendingColor: {r: 0.4, g: 0.4, b: 0.4, a: 0.8}
-  stepCompleteColor: {r: 0.2, g: 1, b: 0.35, a: 1}
-  stepErrorColor: {r: 1, g: 0.25, b: 0.25, a: 1}
-  autoAlignButton: {fileID: 0}
-  resetButton: {fileID: 0}
-  validateButton: {fileID: 0}
-  snapToggle: {fileID: 0}
-  resultPanel: {fileID: 0}
-  resultTitle: {fileID: 0}
-  resultDetail: {fileID: 0}
-  resultPanelBg: {fileID: 0}
-  resultCloseButton: {fileID: 0}
-  resultCorrectColor: {r: 0.1, g: 0.45, b: 0.1, a: 0.88}
-  resultErrorColor: {r: 0.45, g: 0.1, b: 0.1, a: 0.88}
 --- !u!4 &1614088845
 Transform:
   m_ObjectHideFlags: 0
@@ -1523,11 +1603,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ab467381ba2aced4f90f88da2fbadb38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  experimentController: {fileID: 0}
-  panelWidth: 300
+  experimentController: {fileID: 1614088847}
+  panelWidth: 269
   wavelength: 632.8
   slitDistance: 0.4
-  screenDistance: 3.5
   measuredDeltaX: 0.63
 --- !u!114 &1614088847
 MonoBehaviour:
@@ -1544,139 +1623,13 @@ MonoBehaviour:
   interferenceRenderer: {fileID: 1812360457}
   waveFieldRenderer: {fileID: 1311178102}
   lutGenerator: {fileID: 1812360459}
-  benchManager: {fileID: 0}
-  hintUI: {fileID: 0}
+  benchManager: {fileID: 1575472554}
+  hintUI: {fileID: 822473370}
   parameterManager: {fileID: 0}
   formulaCalculator: {fileID: 0}
-  measurementTool: {fileID: 0}
-  defaultWavelength: 632.8
-  defaultSlitDistance: 0.398
-  defaultScreenDistance: 3.17
+  measurementTool: {fileID: 1812360462}
   mainCamera: {fileID: 1998293748}
   frontViewCamera: {fileID: 227151301}
---- !u!114 &1614088848
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1614088843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c78ebc0193736454fb119b8cf5ad6143, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  lightSource: {fileID: 177631767}
-  singleSlit: {fileID: 2131167261}
-  doubleSlit: {fileID: 189980872}
---- !u!21 &1699044913
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: WaveField2D (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance) (Instance) (Instance) (Instance) (Instance)
-    (Instance) (Instance) (Instance)
-  m_Shader: {fileID: 4800000, guid: e515f8efecf01b0488802f780fe086f7, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailAlbedoMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailMask:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailNormalMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _ParallaxMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _Aspect: 4.2799973
-    - _Brightness: 1.42
-    - _BumpScale: 1
-    - _Cutoff: 0.5
-    - _DetailNormalMapScale: 1
-    - _DstBlend: 0
-    - _GlossMapScale: 1
-    - _Glossiness: 0.5
-    - _GlossyReflections: 1
-    - _Metallic: 0
-    - _Mode: 0
-    - _OcclusionStrength: 1
-    - _Parallax: 0.02
-    - _ShowPhase: 0
-    - _Slit1Y: 0.547
-    - _Slit2Y: 0.453
-    - _SmoothnessTextureChannel: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 1
-    - _TimeScale: 0.93
-    - _UVSec: 0
-    - _VisualK: 36.700874
-    - _ZWrite: 1
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _WaveColor: {r: 1, g: 0, b: 0, a: 1}
-  m_BuildTextureStacks: []
 --- !u!1 &1812360454
 GameObject:
   m_ObjectHideFlags: 0
@@ -1691,6 +1644,7 @@ GameObject:
   - component: {fileID: 1812360456}
   - component: {fileID: 1812360459}
   - component: {fileID: 1812360460}
+  - component: {fileID: 1812360462}
   m_Layer: 3
   m_Name: Screen
   m_TagString: Untagged
@@ -1707,7 +1661,7 @@ Transform:
   m_GameObject: {fileID: 1812360454}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -1, z: 0, w: 0}
-  m_LocalPosition: {x: -10.83, y: 5.8, z: -16.32}
+  m_LocalPosition: {x: -10.8, y: 5.8, z: -16.32}
   m_LocalScale: {x: 5, y: 2.5, z: 0.13868624}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1839,6 +1793,27 @@ MonoBehaviour:
   isNearSnap: 0
   isCorrect: 0
   homePosition: {x: 0, y: 0, z: 0}
+--- !u!114 &1812360462
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1812360454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e3d332445a998545862985c89a585d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  totalRangeMm: 40
+  reticleColor: {r: 0.1, g: 0.9, b: 0.3, a: 0.9}
+  _isMeasuring: 0
+  _handwheelPos: 0.5
+  _posA1: 0
+  _posA2: 0
+  _hasA1: 0
+  _hasA2: 0
+  _infoText: 
 --- !u!1 &1998293746
 GameObject:
   m_ObjectHideFlags: 0
@@ -2076,4 +2051,3 @@ SceneRoots:
   - {fileID: 189980876}
   - {fileID: 1614088845}
   - {fileID: 227151302}
-  - {fileID: 1311178104}
