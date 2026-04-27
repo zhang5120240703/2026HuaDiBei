@@ -27,7 +27,7 @@ using UnityEngine;
 ///     OnStepEntered       进入新步骤，切换 UI 面板
 ///     OnParamError        参数校验失败，显示错误文字
 ///     OnSimulationReady   仿真数据就绪，可显示轨迹预览
-///     OnObserveData       Step4 观测数据，刷新数据面板
+///     OnObserveData       Step4 观测数据，刷新数据面板（hDist, yDist, totalDist, count）
 ///     OnPaused / OnResumed    暂停/恢复按钮状态切换
 ///     OnReset             UI 全部恢复初始状态
 ///     OnFlowError         流程跳转失败提示
@@ -92,7 +92,8 @@ public class ProjectileExperimentController : MonoBehaviour
 
     /// <summary>
     /// Step4 观测数据推送（进入 Step4 时发送一次）
-    /// float xDist, float yDist, float totalDist, int pointCount
+    /// float hDist, float yDist, float totalDist, int pointCount
+    /// hDist = 水平面（XZ 平面）位移，支持任意发射方向
     /// </summary>
     public event Action<float, float, float, int> OnObserveData;
 
@@ -635,13 +636,13 @@ public class ProjectileExperimentController : MonoBehaviour
         if (SimulationDataBuffer.HasValidData())
         {
             OnObserveData?.Invoke(
-                SimulationDataBuffer.XDistance,
+                SimulationDataBuffer.HorizontalDistance,
                 SimulationDataBuffer.YDistance,
                 SimulationDataBuffer.TotalDistance,
                 SimulationDataBuffer.TrajectoryPointCount);
 
             Debug.Log($"[ExperimentController] 观测数据：" +
-                      $"X位移={SimulationDataBuffer.XDistance:F2}m  " +
+                      $"水平位移={SimulationDataBuffer.HorizontalDistance:F2}m  " +
                       $"Y位移={SimulationDataBuffer.YDistance:F2}m  " +
                       $"总路程={SimulationDataBuffer.TotalDistance:F2}m  " +
                       $"轨迹点={SimulationDataBuffer.TrajectoryPointCount}");
@@ -821,7 +822,7 @@ public class ProjectileExperimentController : MonoBehaviour
  ║              ║                      ║ OnSimulationReady(snapshot,points)║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
  ║ Step4 观察   ║ ConfirmObserved()    ║ OnStepEntered(Step4_Observe)      ║
- ║              ║                      ║ OnObserveData(xD,yD,total,count)  ║
+ ║              ║                      ║ OnObserveData(hD,yD,total,count) ║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
  ║ Step5 结束   ║ ConfirmFinish()      ║ OnStepEntered(Step5_Finish)       ║
  ╠══════════════╬══════════════════════╬═══════════════════════════════════╣
