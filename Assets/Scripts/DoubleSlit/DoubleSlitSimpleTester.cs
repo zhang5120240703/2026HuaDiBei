@@ -14,8 +14,8 @@ public class DoubleSlitSimpleTester : MonoBehaviour
     [Header("参数默认值")]
     [Range(380f, 780f)] public float wavelength = 632.8f;
     [Range(0.01f, 1f)] public float slitDistance = 0.1f;
-    [Range(0.1f, 5f)] public float screenDistance = 1f;
-    [Range(0.01f, 5f)] public float measuredDeltaX = 0.63f;
+    public float measuredDeltaX = 0.63f;
+    private string _measureInput = "0.63";
 
     // ── 运行时 ─────────────────────────────────────────────────
     private string _log = "";
@@ -23,7 +23,7 @@ public class DoubleSlitSimpleTester : MonoBehaviour
 
     // ── 样式（懒加载）─────────────────────────────────────────
     private bool _built;
-    private GUIStyle _sTitle, _sStep, _sLabel, _sBold, _sLog, _sBtn, _sDiv;
+    private GUIStyle _sTitle, _sStep, _sLabel, _sBold, _sLog, _sBtn, _sDiv, _sTextField;
     private Texture2D _tPanel, _tBtn, _tBtnH, _tBtnA, _tLog;
 
     static readonly Color CB = new Color(0.07f, 0.09f, 0.17f, 0.95f);
@@ -94,21 +94,21 @@ public class DoubleSlitSimpleTester : MonoBehaviour
         GUILayout.Label($"缝距  d = {slitDistance:F3} mm", _sBold);
         slitDistance = HSlider(slitDistance, 0.01f, 1f);
 
-        GUILayout.Label($"屏距  L = {screenDistance:F2} m", _sBold);
-        screenDistance = HSlider(screenDistance, 0.1f, 5f);
-
-        float preview = slitDistance > 0f
-            ? (wavelength * 1e-9f * screenDistance / (slitDistance * 1e-3f)) * 1000f
-            : 0f;
-        GUI.color = CDm;
-        GUILayout.Label($"  预测 Δx ≈ {preview:F3} mm", _sLabel);
-        GUI.color = Color.white;
+        if (hasCtrl)
+        {
+            float actualL = Ctrl().benchManager != null && Ctrl().benchManager.doubleSlit != null && Ctrl().benchManager.screen != null
+                ? Ctrl().benchManager.GetDistanceAlongBench(Ctrl().benchManager.doubleSlit, Ctrl().benchManager.screen)
+                : 0f;
+            GUI.color = CDm;
+            GUILayout.Label($"屏距  L = {actualL:F2} m (实测)", _sLabel);
+            GUI.color = Color.white;
+        }
         GUILayout.Space(4);
 
         GUI.enabled = hasCtrl;
         if (Btn("应用参数"))
         {
-            Ctrl().SetParameters(wavelength, slitDistance, screenDistance);
+            Ctrl().SetParameters(wavelength, slitDistance);
             Refresh();
         }
 
@@ -171,8 +171,36 @@ public class DoubleSlitSimpleTester : MonoBehaviour
         // ── 步骤 3 ─────────────────────────────────────────────
         StepHead("③ 测量条纹", step == DoubleSlitSimpleController.ExperimentStep.Measure);
 
-        GUILayout.Label($"Δx = {measuredDeltaX:F3} mm", _sBold);
-        measuredDeltaX = HSlider(measuredDeltaX, 0.01f, 5f);
+        if (hasCtrl)
+        {
+            bool hasMeasTool = Ctrl().measurementTool != null;
+            if (hasMeasTool)
+            {
+                GUI.color = new Color(0.3f, 0.9f, 1f);
+                GUILayout.Label("🔬 读数显微镜测量：", _sBold);
+                GUI.color = Color.white;
+                GUILayout.Space(2);
+            }
+            else
+            {
+                GUI.color = new Color(1f, 0.6f, 0.2f);
+                GUILayout.Label("⚠ 测量工具未配置", _sBold);
+                GUI.color = Color.white;
+                GUILayout.Space(2);
+            }
+        }
+
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Δx = ", _sBold, GUILayout.Width(36));
+        string prevInput = _measureInput;
+        _measureInput = GUILayout.TextField(_measureInput, _sTextField, GUILayout.Width(70));
+        if (_measureInput != prevInput)
+        {
+            if (float.TryParse(_measureInput, out float val))
+                measuredDeltaX = Mathf.Clamp(val, 0.01f, 20f);
+        }
+        GUILayout.Label(" mm", _sBold);
+        GUILayout.EndHorizontal();
 
         if (hasCtrl)
         {
@@ -181,7 +209,11 @@ public class DoubleSlitSimpleTester : MonoBehaviour
             GUI.color = err < 5f ? new Color(0.3f, 1f, 0.5f)
                       : err < 15f ? new Color(1f, 0.85f, 0.2f)
                       : new Color(1f, 0.3f, 0.3f);
-            GUILayout.Label($"  实时误差估算：{err:F1}%", _sLabel);
+            GUILayout.Label($"  理论值 {th:F3} mm | 误差 {err:F1}%", _sLabel);
+            GUI.color = Color.white;
+
+            GUI.color = CDm;
+            GUILayout.Label($"  预期范围: {th * 0.8f:F2} ~ {th * 1.2f:F2} mm (±20%)", _sLabel);
             GUI.color = Color.white;
         }
         GUILayout.Space(4);
@@ -226,11 +258,11 @@ public class DoubleSlitSimpleTester : MonoBehaviour
     void QuickTest()
     {
         if (Ctrl() == null) return;
-        wavelength = 632.8f; slitDistance = 0.1f; screenDistance = 1f;
-        // 理论值 = 632.8e-9 * 1 / 0.1e-3 * 1000 = 6.328mm
+        wavelength = 632.8f; slitDistance = 0.1f;
         measuredDeltaX = 6.328f;
+        _measureInput = "6.328";
         Ctrl().ResetExperiment();
-        Ctrl().SetParameters(wavelength, slitDistance, screenDistance);
+        Ctrl().SetParameters(wavelength, slitDistance);
         Ctrl().ConfirmParameters();
         Ctrl().StartMeasurement();
         Ctrl().RecordMeasurement(measuredDeltaX);
@@ -315,6 +347,14 @@ public class DoubleSlitSimpleTester : MonoBehaviour
             hover = { textColor = Color.white, background = _tBtnH },
             active = { textColor = Color.white, background = _tBtnA }
         };
+        _sTextField = new GUIStyle(GUI.skin.textField)
+        {
+            fontSize = 16,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = Color.white, background = _tBtn },
+            margin = new RectOffset(0, 0, 2, 2)
+        };
     }
 
     static GUIStyle S(int size, FontStyle fs, Color c, bool wordWrap = false)
@@ -331,8 +371,6 @@ public class DoubleSlitSimpleTester : MonoBehaviour
     {
         wavelength = Mathf.Clamp(wavelength, 380f, 780f);
         slitDistance = Mathf.Clamp(slitDistance, 0.01f, 1f);
-        screenDistance = Mathf.Clamp(screenDistance, 0.1f, 5f);
-        measuredDeltaX = Mathf.Clamp(measuredDeltaX, 0.01f, 5f);
     }
 #endif
 }
