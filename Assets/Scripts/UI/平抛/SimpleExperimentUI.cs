@@ -166,20 +166,6 @@ public class SimpleExperimentUI : MonoBehaviour
     {
         if (_isDestroyed) return;
         ShowStepPanel((int)step);
-
-        // Step3 时自动点一下暂停再恢复，强制激活小球动画
-        if (step == ExperimentStep.Step3_RunSim)
-        {
-            StartCoroutine(KickBallAnimation());
-        }
-    }
-
-    IEnumerator KickBallAnimation()
-    {
-        yield return new WaitForSeconds(0.3f);
-        _ctrl?.RequestPause();
-        yield return new WaitForSeconds(0.1f);
-        _ctrl?.RequestResume();
     }
 
     void ShowStepPanel(int index)
