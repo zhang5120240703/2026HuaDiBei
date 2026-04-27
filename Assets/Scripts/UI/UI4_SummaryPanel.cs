@@ -24,40 +24,51 @@ public class UI4_SummaryPanel : MonoBehaviour
     public void RefreshSummary()
     {
         var dataMgr = ExperimentDataManager.Instance;
-        var lastRecord = dataMgr?.GetLastRecord();
+        var bridge = ExperimentResultBridge.Instance;
 
+        // Text 1: 实验名称
         // Text 1: 实验名称
         if (txtExperimentName != null)
         {
-            string expName = lastRecord != null ? lastRecord.experimentName : "未知实验";
+            string expName = (bridge != null && !string.IsNullOrEmpty(bridge.experimentDisplayName))
+                ? bridge.experimentDisplayName
+                : "未知实验";
             txtExperimentName.text = $"实验：{expName}";
         }
 
         // Text 2: 用时
         if (txtDuration != null)
         {
-            string duration = lastRecord != null ? lastRecord.duration : "—";
-            txtDuration.text = $"用时：{duration}";
+            if (bridge != null && bridge.ElapsedTime > 0f)
+            {
+                string duration = ExperimentResultBridge.FormatDuration(bridge.ElapsedTime);
+                txtDuration.text = $"用时：{duration}";
+            }
+            else
+            {
+                txtDuration.text = "用时：—";
+            }
         }
 
-        // Text 3: 历史数据列表
+        // Text 3: 本次流程的所有数据
         if (txtDataList != null && dataMgr != null)
         {
-            string expName = lastRecord != null ? lastRecord.experimentName : "";
-            List<ExperimentRecord> filtered = !string.IsNullOrEmpty(expName)
-                ? dataMgr.GetRecordsByName(expName)
-                : dataMgr.Records;
+            string expName = (bridge != null && !string.IsNullOrEmpty(bridge.experimentName))
+                ? bridge.experimentName
+                : "";
 
-            if (filtered.Count == 0)
+            var allRecords = dataMgr.GetRecordsByName(expName);
+
+            if (allRecords.Count == 0)
             {
                 txtDataList.text = "暂无实验记录";
             }
             else
             {
                 System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                for (int i = 0; i < filtered.Count; i++)
+                for (int i = 0; i < allRecords.Count; i++)
                 {
-                    sb.AppendLine($"第{i + 1}次: {filtered[i].ToDisplayString()}");
+                    sb.AppendLine($"第{i + 1}次: {allRecords[i].ToDisplayString()}");
                 }
                 txtDataList.text = sb.ToString();
             }

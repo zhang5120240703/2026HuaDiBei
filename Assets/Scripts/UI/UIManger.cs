@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
 {
+    
     public static UIManager instance;
 
     public GameObject[] uiPages;
@@ -47,9 +48,13 @@ public class UIManager : MonoBehaviour
             uiPages[index].SetActive(true);
     }
 
-    public void SelectExperiment(string sceneName)
+    private string selectedExperimentDisplayName; // SO 中的显示名称
+
+    public void SelectExperiment(string sceneName, string displayName = null)
     {
         selectedScene = sceneName;
+        if (!string.IsNullOrEmpty(displayName))
+            selectedExperimentDisplayName = displayName;
         ShowPage(1);
     }
 
@@ -60,6 +65,7 @@ public class UIManager : MonoBehaviour
             ExperimentResultBridge.Instance.Clear();
             ExperimentResultBridge.Instance.experimentName = selectedScene;
             ExperimentResultBridge.Instance.startTime = Time.time;
+            ExperimentResultBridge.Instance.experimentDisplayName = selectedExperimentDisplayName;
         }
 
         StartCoroutine(LoadToScene());
@@ -69,6 +75,15 @@ public class UIManager : MonoBehaviour
     {
         ShowPage(3);
     }
+    public void ShowStart()
+    {
+        ShowPage(0);
+    }
+    public void Show4()
+    {
+        ShowPage(4);
+    }
+
 
     public void Next()
     {

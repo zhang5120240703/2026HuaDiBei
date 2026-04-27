@@ -265,7 +265,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 16f1e2c67156f1647bd6420ac1f8856f, type: 2}
+  - {fileID: 2100000, guid: 19fcacd316acaf848bac1f339d38db99, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3891,7 +3891,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &2500772943528814075
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5652,7 +5652,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
   m_sharedMaterial: {fileID: -5754135381703944143, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
@@ -5813,7 +5813,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Y\u4F4D\u79FB"
+  m_text: "\u7AD6\u76F4\u4F4D\u79FB"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
   m_sharedMaterial: {fileID: -5754135381703944143, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
@@ -7847,7 +7847,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &6380377862865890167
 RectTransform:
   m_ObjectHideFlags: 0
@@ -10864,7 +10864,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "X\u4F4D\u79FB"
+  m_text: "\u6C34\u5E73\u4F4D\u79FB"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
   m_sharedMaterial: {fileID: -5754135381703944143, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
@@ -10907,7 +10907,7 @@ MonoBehaviour:
   m_lineSpacingMax: 0
   m_paragraphSpacing: 0
   m_charWidthMaxAdj: 0
-  m_enableWordWrapping: 1
+  m_enableWordWrapping: 0
   m_wordWrappingRatios: 0.4
   m_overflowMode: 0
   m_linkedTextComponent: {fileID: 0}

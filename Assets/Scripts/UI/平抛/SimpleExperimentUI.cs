@@ -192,11 +192,22 @@ public class SimpleExperimentUI : MonoBehaviour
     void OnSimulationReady(LaunchParamSnapshot snap, List<Vector3> points)
     {
         if (_isDestroyed || txtSimResult == null) return;
+
         txtSimResult.text = $"仿真完成\n" +
                            $"轨迹点数：{points.Count}\n" +
                            $"速度：{snap.InitialVelocity} m/s\n" +
                            $"仰角：{snap.LaunchAngle}°\n" +
                            $"起点高度：{snap.StartPosition.y} m";
+
+        // 追加到本次流程的临时存储
+        SessionDataStore.Add(
+            SimulationDataBuffer.HorizontalDistance,
+            SimulationDataBuffer.YDistance,
+            SimulationDataBuffer.TotalDistance,
+            SimulationDataBuffer.TrajectoryPointCount,
+            snap.InitialVelocity,
+            snap.LaunchAngle
+        );
     }
 
     void OnObserveData(float xD, float yD, float total, int count)

@@ -1,27 +1,20 @@
 ﻿using UnityEngine;
 
-/// <summary>
-/// 跨场景数据桥：传递实验名称、用时、轨迹数据、参数
-/// DontDestroyOnLoad 单例，生命周期贯穿 MainMenu ↔ 实验场景
-/// </summary>
 public class ExperimentResultBridge : MonoBehaviour
 {
     public static ExperimentResultBridge Instance;
 
-    // ── 从主菜单传入 ──
-    public string experimentName;       // 实验名称
-    public float startTime;             // 开始时间（Time.time）
+    public string experimentName;         // 实验场景名
+    public string experimentDisplayName;  // 实验显示名称（从 SO 读取）
+    public float startTime;
 
-    // ── 从实验场景写入 ──
-    public float returnTime;            // 返回时间（Time.time）
+    public float returnTime;
     public float xDistance;
     public float yDistance;
     public float totalDistance;
     public int trajectoryPointCount;
-
-    // ★ 新增：发射参数
-    public float velocity;              // 初速度 (m/s)
-    public float launchAngle;           // 仰角 (°)
+    public float velocity;
+    public float launchAngle;
 
     void Awake()
     {
@@ -36,16 +29,12 @@ public class ExperimentResultBridge : MonoBehaviour
         }
     }
 
-    /// <summary>计算总用时（秒）</summary>
     public float ElapsedTime => returnTime - startTime;
 
-    /// <summary>
-    /// 清空数据，准备下一次实验。
-    /// 调用时机：BackToMain（放弃实验） 或 UI4 确认关闭后。
-    /// </summary>
     public void Clear()
     {
         experimentName = "";
+        experimentDisplayName = "";
         startTime = 0f;
         returnTime = 0f;
         xDistance = 0f;
@@ -56,10 +45,6 @@ public class ExperimentResultBridge : MonoBehaviour
         launchAngle = 0f;
     }
 
-    /// <summary>
-    /// 格式化秒数为可读时长字符串。
-    /// 例：3667.3f → "1小时1分7秒";  85.2f → "1分25秒";  3.5f → "3秒"
-    /// </summary>
     public static string FormatDuration(float seconds)
     {
         if (seconds <= 0f) return "0秒";
