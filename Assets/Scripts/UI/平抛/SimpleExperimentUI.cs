@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Collections;
 using System.Collections.Generic;
 
 public class SimpleExperimentUI : MonoBehaviour
@@ -38,6 +39,7 @@ public class SimpleExperimentUI : MonoBehaviour
     public TextMeshProUGUI txtPointCount;
 
     private ProjectileExperimentController _ctrl;
+    private bool _isDestroyed = false;
 
     void Start()
     {
@@ -51,20 +53,54 @@ public class SimpleExperimentUI : MonoBehaviour
         BindButtons();
         BindControllerEvents();
         InitUI();
+
+        StartCoroutine(DelayedReset());
+    }
+
+    IEnumerator DelayedReset()
+    {
+        yield return null;
+        yield return null;
+        yield return null;
+        yield return null;
+        _ctrl?.RequestReset();
+    }
+
+    void OnDestroy()
+    {
+        _isDestroyed = true;
+        CancelInvoke();
+
+        if (_ctrl != null)
+        {
+            _ctrl.OnStepEntered -= OnStepChanged;
+            _ctrl.OnParamLoaded -= OnParamLoaded;
+            _ctrl.OnParamError -= ShowError;
+            _ctrl.OnSimulationReady -= OnSimulationReady;
+            _ctrl.OnObserveData -= OnObserveData;
+            _ctrl.OnPaused -= OnPaused;
+            _ctrl.OnResumed -= OnResumed;
+            _ctrl.OnReset -= OnReset;
+            _ctrl.OnFlowError -= OnFlowError;
+        }
     }
 
     void BindButtons()
     {
-        // 常驻按钮
-        btnPause.onClick.AddListener(() => _ctrl.RequestPause());
-        btnResume.onClick.AddListener(() => _ctrl.RequestResume());
-        btnReset.onClick.AddListener(() => _ctrl.RequestReset());
+        btnPause.onClick.AddListener(() => _ctrl?.RequestPause());
+        btnResume.onClick.AddListener(() => _ctrl?.RequestResume());
+        btnReset.onClick.AddListener(() => _ctrl?.RequestReset());
 
-        // 步骤按钮
-        btnConfirmStep1.onClick.AddListener(() => _ctrl.ConfirmPrepare());
-        btnConfirmStep2.onClick.AddListener(() => { PushParams(); _ctrl.ConfirmParam(); });
-        btnConfirmStep4.onClick.AddListener(() => _ctrl.ConfirmObserved());
-        btnFinishSteps.onClick.AddListener(() => _ctrl.ConfirmFinish());
+        btnConfirmStep1.onClick.AddListener(() => _ctrl?.ConfirmPrepare());
+
+        btnConfirmStep2.onClick.AddListener(() =>
+        {
+            PushParams();
+            _ctrl?.ConfirmParam();
+        });
+
+        btnConfirmStep4.onClick.AddListener(() => _ctrl?.ConfirmObserved());
+        btnFinishSteps.onClick.AddListener(() => _ctrl?.ConfirmFinish());
     }
 
     void BindControllerEvents()
@@ -77,39 +113,39 @@ public class SimpleExperimentUI : MonoBehaviour
         _ctrl.OnPaused += OnPaused;
         _ctrl.OnResumed += OnResumed;
         _ctrl.OnReset += OnReset;
+        _ctrl.OnFlowError += OnFlowError;
     }
 
     void InitUI()
     {
-        // 显示Step1面板
         ShowStepPanel(0);
 
-        // 设置默认参数显示
-        inputVelocity.text = "10";
-        inputAngle.text = "45";
-        inputDirX.text = "0";
-        inputDirZ.text = "1";
-        inputStartY.text = "1";
-        inputTimeStep.text = "0.02";
-        inputTotalTime.text = "5";
+        if (inputVelocity != null) inputVelocity.text = "10";
+        if (inputAngle != null) inputAngle.text = "45";
+        if (inputDirX != null) inputDirX.text = "0";
+        if (inputDirZ != null) inputDirZ.text = "1";
+        if (inputStartY != null) inputStartY.text = "1";
+        if (inputTimeStep != null) inputTimeStep.text = "0.02";
+        if (inputTotalTime != null) inputTotalTime.text = "5";
 
-        // 按钮初始状态
-        btnPause.interactable = true;
-        btnResume.interactable = false;   // 初始未暂停，恢复按钮不可用
-        txtStatus.text = "⚪ 空闲";
+        if (btnPause != null) btnPause.interactable = true;
+        if (btnResume != null) btnResume.interactable = false;
+        if (txtStatus != null) txtStatus.text = "⚪ 空闲";
 
         HideError();
     }
 
     void PushParams()
     {
-        float v = float.Parse(inputVelocity.text);
-        float angle = float.Parse(inputAngle.text);
-        float dirX = float.Parse(inputDirX.text);
-        float dirZ = float.Parse(inputDirZ.text);
-        float startY = float.Parse(inputStartY.text);
-        float dt = float.Parse(inputTimeStep.text);
-        float totalT = float.Parse(inputTotalTime.text);
+        if (_ctrl == null) return;
+
+        float v = ParseFloat(inputVelocity?.text, 10f);
+        float angle = ParseFloat(inputAngle?.text, 45f);
+        float dirX = ParseFloat(inputDirX?.text, 0f);
+        float dirZ = ParseFloat(inputDirZ?.text, 1f);
+        float startY = ParseFloat(inputStartY?.text, 1f);
+        float dt = ParseFloat(inputTimeStep?.text, 0.02f);
+        float totalT = ParseFloat(inputTotalTime?.text, 5f);
 
         _ctrl.SetParam(
             velocity: v,
@@ -120,9 +156,30 @@ public class SimpleExperimentUI : MonoBehaviour
             totalTime: totalT);
     }
 
+    float ParseFloat(string text, float fallback)
+    {
+        if (string.IsNullOrEmpty(text)) return fallback;
+        return float.TryParse(text, out float val) ? val : fallback;
+    }
+
     void OnStepChanged(ExperimentStep step)
     {
+        if (_isDestroyed) return;
         ShowStepPanel((int)step);
+
+        // Step3 时自动点一下暂停再恢复，强制激活小球动画
+        if (step == ExperimentStep.Step3_RunSim)
+        {
+            StartCoroutine(KickBallAnimation());
+        }
+    }
+
+    IEnumerator KickBallAnimation()
+    {
+        yield return new WaitForSeconds(0.3f);
+        _ctrl?.RequestPause();
+        yield return new WaitForSeconds(0.1f);
+        _ctrl?.RequestResume();
     }
 
     void ShowStepPanel(int index)
@@ -136,56 +193,63 @@ public class SimpleExperimentUI : MonoBehaviour
 
     void OnParamLoaded(float v, float angle, Vector3 dir, Vector3 pos, float dt, float T)
     {
-        inputVelocity.text = v.ToString();
-        inputAngle.text = angle.ToString();
-        inputDirX.text = dir.x.ToString();
-        inputDirZ.text = dir.z.ToString();
-        inputStartY.text = pos.y.ToString();
-        inputTimeStep.text = dt.ToString();
-        inputTotalTime.text = T.ToString();
+        if (_isDestroyed) return;
+        if (inputVelocity != null) inputVelocity.text = v.ToString();
+        if (inputAngle != null) inputAngle.text = angle.ToString();
+        if (inputDirX != null) inputDirX.text = dir.x.ToString();
+        if (inputDirZ != null) inputDirZ.text = dir.z.ToString();
+        if (inputStartY != null) inputStartY.text = pos.y.ToString();
+        if (inputTimeStep != null) inputTimeStep.text = dt.ToString();
+        if (inputTotalTime != null) inputTotalTime.text = T.ToString();
     }
 
     void OnSimulationReady(LaunchParamSnapshot snap, List<Vector3> points)
     {
-        txtSimResult.text = $"✅ 仿真完成\n" +
+        if (_isDestroyed || txtSimResult == null) return;
+        txtSimResult.text = $"仿真完成\n" +
                            $"轨迹点数：{points.Count}\n" +
-                           $"初速度：{snap.InitialVelocity} m/s\n" +
+                           $"速度：{snap.InitialVelocity} m/s\n" +
                            $"仰角：{snap.LaunchAngle}°\n" +
                            $"起点高度：{snap.StartPosition.y} m";
     }
 
     void OnObserveData(float xD, float yD, float total, int count)
     {
-        txtXDist.text = $"X位移：{xD:F2} m";
-        txtYDist.text = $"Y位移：{yD:F2} m";
-        txtTotalDist.text = $"总路程：{total:F2} m";
-        txtPointCount.text = $"轨迹点数：{count}";
+        if (_isDestroyed) return;
+        if (txtXDist != null) txtXDist.text = $"{xD:F2} m";
+        if (txtYDist != null) txtYDist.text = $"{yD:F2} m";
+        if (txtTotalDist != null) txtTotalDist.text = $"{total:F2} m";
+        if (txtPointCount != null) txtPointCount.text = $"{count}";
     }
 
     void OnPaused()
     {
-        btnPause.interactable = false;   // 暂停后禁用暂停按钮
-        btnResume.interactable = true;   // 启用恢复按钮
-        txtStatus.text = "⏸ 已暂停";
+        if (_isDestroyed) return;
+        if (btnPause != null) btnPause.interactable = false;
+        if (btnResume != null) btnResume.interactable = true;
+        if (txtStatus != null) txtStatus.text = "已暂停";
     }
 
     void OnResumed()
     {
-        btnPause.interactable = true;    // 启用暂停按钮
-        btnResume.interactable = false;  // 禁用恢复按钮
-        txtStatus.text = "▶ 运行中";
+        if (_isDestroyed) return;
+        if (btnPause != null) btnPause.interactable = true;
+        if (btnResume != null) btnResume.interactable = false;
+        if (txtStatus != null) txtStatus.text = "运行中";
     }
 
     void OnReset()
     {
-        btnPause.interactable = true;
-        btnResume.interactable = false;
-        txtStatus.text = "⚪ 空闲";
+        if (_isDestroyed) return;
+        if (btnPause != null) btnPause.interactable = true;
+        if (btnResume != null) btnResume.interactable = false;
+        if (txtStatus != null) txtStatus.text = "空闲";
         HideError();
     }
 
     void ShowError(string msg)
     {
+        if (_isDestroyed || txtError == null) return;
         txtError.text = msg;
         txtError.gameObject.SetActive(true);
         Invoke(nameof(HideError), 3f);
@@ -193,6 +257,19 @@ public class SimpleExperimentUI : MonoBehaviour
 
     void HideError()
     {
+        if (_isDestroyed || txtError == null) return;
         txtError.gameObject.SetActive(false);
+    }
+
+    void OnFlowError(string msg)
+    {
+        Debug.LogError($"[SimpleExperimentUI] 流程错误: {msg}");
+
+        if (msg.Contains("不在准备阶段") || msg.Contains("不在参数设置阶段") ||
+            msg.Contains("不在观察阶段") || msg.Contains("不在结束阶段"))
+        {
+            Debug.Log("[SimpleExperimentUI] 检测到步骤不匹配，自动重置流程...");
+            _ctrl?.RequestReset();
+        }
     }
 }

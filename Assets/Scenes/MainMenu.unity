@@ -737,8 +737,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 46.7
-  m_fontSizeBase: 46.7
+  m_fontSize: 29
+  m_fontSizeBase: 29
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -3239,19 +3239,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 584414936}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1071291727}
-        m_TargetAssemblyTypeName: MainUIMgr, Assembly-CSharp
-        m_MethodName: Back
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &584414936
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4668,6 +4656,7 @@ GameObject:
   - component: {fileID: 847027311}
   - component: {fileID: 847027310}
   - component: {fileID: 847027309}
+  - component: {fileID: 847027313}
   m_Layer: 5
   m_Name: "\u603B\u7ED3"
   m_TagString: Untagged
@@ -4766,6 +4755,21 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &847027313
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 847027308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 595695b561a55a84d90cb0d2112f9187, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  txtExperimentName: {fileID: 1265267522}
+  txtDuration: {fileID: 77126456}
+  txtDataList: {fileID: 1858139576}
 --- !u!1 &869298597
 GameObject:
   m_ObjectHideFlags: 0
@@ -5812,11 +5816,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 1071291726}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 27f49de48fd51e24dbee6e12580d3e1d, type: 3}
+  m_Script: {fileID: 11500000, guid: 595695b561a55a84d90cb0d2112f9187, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  selectIndex: 0
-  curSelectData: {fileID: 0}
+  txtExperimentName: {fileID: 1265267522}
+  txtDuration: {fileID: 77126456}
+  txtDataList: {fileID: 1858139576}
 --- !u!1 &1076988575
 GameObject:
   m_ObjectHideFlags: 0
@@ -6192,19 +6197,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1116487364}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1071291727}
-        m_TargetAssemblyTypeName: MainUIMgr, Assembly-CSharp
-        m_MethodName: Next
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &1116487364
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6513,6 +6506,51 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1230601747}
   m_CullTransparentMesh: 1
+--- !u!1 &1237090037
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1237090039}
+  - component: {fileID: 1237090038}
+  m_Layer: 0
+  m_Name: ExperimentDataManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1237090038
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1237090037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56826c30bb5823d4fad29ec154b8fedb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  records: []
+--- !u!4 &1237090039
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1237090037}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1121.4308, y: 390.27158, z: 7.8755307}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1237467266
 GameObject:
   m_ObjectHideFlags: 0
@@ -6938,19 +6976,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1257784968}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1071291727}
-        m_TargetAssemblyTypeName: MainUIMgr, Assembly-CSharp
-        m_MethodName: Next
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &1257784968
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7073,8 +7099,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 46.7
-  m_fontSizeBase: 46.7
+  m_fontSize: 27.9
+  m_fontSizeBase: 27.9
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -8066,8 +8092,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 20.98
+  m_fontSizeBase: 20.98
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -9252,8 +9278,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 0}
-  m_sharedMaterial: {fileID: 0}
+  m_fontAsset: {fileID: 11400000, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
+  m_sharedMaterial: {fileID: -5754135381703944143, guid: df5da114a8fcf3246bd289dccf666db2, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -9272,7 +9298,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -9338,7 +9364,7 @@ GameObject:
   - component: {fileID: 1878568471}
   - component: {fileID: 1878568470}
   m_Layer: 0
-  m_Name: "ExperimentResultBridge\u5E73\u629B"
+  m_Name: ExperimentResultBridge
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -9363,6 +9389,8 @@ MonoBehaviour:
   yDistance: 0
   totalDistance: 0
   trajectoryPointCount: 0
+  velocity: 0
+  launchAngle: 0
 --- !u!4 &1878568471
 Transform:
   m_ObjectHideFlags: 0
@@ -10550,3 +10578,4 @@ SceneRoots:
   - {fileID: 1755345645}
   - {fileID: 1024389110}
   - {fileID: 1878568471}
+  - {fileID: 1237090039}
