@@ -15,6 +15,7 @@ public class UI_Manager : MonoBehaviour
         IdealGasSimulation.Instance.OnStateChanged += OnStateChanged;
         cylinderController.OnVolumeChanged += OnVolumeChanged;
         cylinderController.OnVolumeRangeExceeded += OnVolumeRangeExceeded;
+        cylinderController.OnInteractionStateChanged += dataCollector.SetUserInteracting;
         dataCollector.OnDataCollected += OnDataCollected;
         dataCollector.OnAnalysisCompleted += OnAnalysisCompleted;
 
@@ -69,7 +70,6 @@ public class UI_Manager : MonoBehaviour
     // 重置所有UI和数据
     public void ResetUI()
     {
-        dataCollector.ResetData();
         graphRenderer.ResetGraphs();
         uiPanel.ResetExperiment();
     }

@@ -1,16 +1,11 @@
 ﻿using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.UIElements;
 using XCharts.Runtime;
-using static ExperimentStepController;
 
 public class GraphRenderer : MonoBehaviour
 {
     // 引用
     public DataCollector dataCollector;
-    public ExperimentStepController experimentStepController;
 
     // 图表组件（Inspector 指定）
     public LineChart pvChart;
@@ -19,7 +14,7 @@ public class GraphRenderer : MonoBehaviour
     public LineChart pInverseTChart;
 
     // 字体（Inspector 指定，可选）
-    public TMP_FontAsset font;
+    //public TMP_FontAsset font;
 
     private bool showLine = false;
     private void Start()

@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Diagnostics;
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -20,9 +18,9 @@ public class UIPanel : MonoBehaviour
     public Slider volumeSlider;
 
     //状态按钮
-    public Button isothermalButton;
-    public Button isobaricButton;
-    public Button isochoricButton;
+    //public Button isothermalButton;
+    //public Button isobaricButton;
+    //public Button isochoricButton;
 
     public TMP_Text processText;
     public TMP_Text statusText;
@@ -46,6 +44,8 @@ public class UIPanel : MonoBehaviour
         //滑动条输入事件监听
         temperatureSlider.onValueChanged.AddListener(OnTemperatureSliderChanged);
         volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
+        RegisterSliderInteraction(temperatureSlider);
+        RegisterSliderInteraction(volumeSlider);
         
         //添加体积范围超出事件监听
         cylinderController.OnVolumeRangeExceeded += OnVolumeRangeExceeded;
@@ -105,13 +105,6 @@ public class UIPanel : MonoBehaviour
         IdealGasSimulation.Instance.SetTemperature(value);
 
     }
-    public void OnPressureSliderChanged(float value)
-    {
-
-        // 使用Slider值来设置压强
-        IdealGasSimulation.Instance.SetPressure(value);
-
-    }
 
     public void OnVolumeSliderChanged(float value)
     {
@@ -121,6 +114,42 @@ public class UIPanel : MonoBehaviour
 
     }
     #endregion
+
+    private void RegisterSliderInteraction(Slider slider)
+    {
+        if (slider == null)
+        {
+            return;
+        }
+
+        AttachSliderInteractionTracker(slider.gameObject);
+
+        if (slider.handleRect != null)
+        {
+            AttachSliderInteractionTracker(slider.handleRect.gameObject);
+        }
+
+        if (slider.targetGraphic != null)
+        {
+            AttachSliderInteractionTracker(slider.targetGraphic.gameObject);
+        }
+    }
+
+    private void AttachSliderInteractionTracker(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SliderInteractionTracker tracker = target.GetComponent<SliderInteractionTracker>();
+        if (tracker == null)
+        {
+            tracker = target.AddComponent<SliderInteractionTracker>();
+        }
+
+        tracker.Initialize(dataCollector.SetUserInteracting);
+    }
 
 
 
@@ -216,43 +245,92 @@ public class UIPanel : MonoBehaviour
 
     public void UpdateAnalysisDisplay()
     {
-        // 显示分析结果
-        float averagePV = dataCollector.GetAveragePVProduct();
-        float error = dataCollector.GetAverageErrorPercentage();
-        
-        string resultText = "分析结果: " + "\n";
-        resultText += "平均PV乘积: " + averagePV.ToString("F2") + " kPa·L\n";
-        resultText += "平均误差: " + error.ToString("F2") + "%\n";
-        
-        // 判断是否验证了定律
-        bool verified = false;
-        string lawName = "";
-        
+        string resultText = "【实验分析结果】\n\n";
+        bool verified;
+        string lawName;
+        string metricName;
+        string metricUnit;
+        float error;
+
         switch (IdealGasSimulation.Instance.GetCurrentProcess())
         {
             case IdealGasSimulation.ProcessType.Isothermal:
                 verified = dataCollector.IsBoyleLawVerified();
-                lawName = "玻意耳定律";
+                lawName = "玻意耳定律（等温）";
+                metricName = "平均 PV";
+                metricUnit = "kPa·L";
+                error = dataCollector.GetPVAverageErrorPercentage();
                 break;
+
             case IdealGasSimulation.ProcessType.Isobaric:
                 verified = dataCollector.IsCharlesLawVerified();
-                lawName = "盖-吕萨克定律";
+                lawName = "查理定律（等压）";
+                metricName = "平均 V/T";
+                metricUnit = "L/K";
+                error = dataCollector.GetVTAverageErrorPercentage();
                 break;
+
             case IdealGasSimulation.ProcessType.Isochoric:
                 verified = dataCollector.IsGayLussacLawVerified();
-                lawName = "查理定律";
+                lawName = "盖-吕萨克定律（等容）";
+                metricName = "平均 P/T";
+                metricUnit = "kPa/K";
+                error = dataCollector.GetPTAverageErrorPercentage();
+                break;
+
+            default:
+                verified = false;
+                lawName = "当前实验规律";
+                metricName = "平均值";
+                metricUnit = "";
+                error = 0f;
                 break;
         }
-        
+
+        float averageValue = dataCollector.GetCurrentAverageValue();
+        float relativeStd = dataCollector.GetCurrentRelativeStd();
+        float coverageRatio = dataCollector.GetDataCoverageRatio();
+        float unstableRatio = dataCollector.GetUnstableSampleRatio();
+
+        resultText += metricName + ": " + averageValue.ToString("F3") + " " + metricUnit + "\n";
+        resultText += "平均误差: " + error.ToString("F2") + "%\n";
+        resultText += "相对波动: " + (relativeStd * 100f).ToString("F2") + "%\n";
+        resultText += "数据覆盖度: " + (coverageRatio * 100f).ToString("F1") + "%\n";
+        resultText += "临界稳定采样占比: " + (unstableRatio * 100f).ToString("F1") + "%\n\n";
+
         if (verified)
         {
-            resultText += "成功验证了 " + lawName;
+            resultText += "成功验证 " + lawName + "\n";
+            resultText += "数据稳定，且采样分布较均匀。";
         }
         else
         {
-            resultText += "未能验证 " + lawName + "，误差超过3%";
+            resultText += "未能验证 " + lawName + "\n";
+            resultText += "\n可能原因：\n";
+
+            if (error > 3.0f)
+            {
+                resultText += "• 数据偏差较大（误差 > 3%）\n";
+            }
+
+            if (relativeStd > 0.05f)
+            {
+                resultText += "• 数据波动较大（操作不稳定）\n";
+            }
+
+            if (coverageRatio <= 0.22f)
+            {
+                resultText += "• 数据点分布范围不足，变量变化不够明显\n";
+            }
+
+            if (unstableRatio > 0.35f)
+            {
+                resultText += "• 多个数据点是在刚稳定时采集的，操作节奏偏快\n";
+            }
+
+            resultText += "\n建议：每次调整后稍作停顿，并让 8 个点覆盖更大的变化范围。";
         }
-        
+
         statusText.text = resultText;
         currentStep = 4;
         UpdateProgressText();
@@ -279,14 +357,12 @@ public class UIPanel : MonoBehaviour
         inputPanel.alpha = 1;
         UpdateStatusText();
         UpdateProgressText();
-        dataCollector.ResetData();
     }
     
     public void ResetExperiment()
     {
         currentStep = 1;
         statusPanel.alpha = 0;//隐藏参数面板
-        dataCollector.ResetData();
         UpdateStatusText();
         UpdateProgressText();
         UpdateProcessText(IdealGasSimulation.Instance.GetCurrentProcess());
@@ -303,8 +379,4 @@ public class UIPanel : MonoBehaviour
         UpdateProgressText();
     }
     
-    public int GetCurrentStep()
-    {
-        return currentStep;
-    }
 }

@@ -13,8 +13,6 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     public float minHeight = 0.2f; // 最小高度（对应0.0L体积）
     public float maxHeight = 2.0f; // 最大高度（对应2.0L体积）
     
-    private float initialY; // 初始鼠标Y位置
-    private float initialPistonY; // 初始活塞Y位置
     private bool isDragging = false;
     private bool canDrag = false; // 是否允许拖动（根据过程类型限制）
     private float lastVolume; // 上一次记录的体积
@@ -36,6 +34,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     // 事件
     public System.Action<float> OnVolumeChanged;
     public System.Action<bool> OnVolumeRangeExceeded; // 当体积超出范围时触发
+    public System.Action<bool> OnInteractionStateChanged;
 
     //平滑移动参数
     private float targetPistonY;// 目标活塞位置
@@ -80,27 +79,6 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
     }
 
 
-    public bool CanChangeState()
-    {
-        var sim= IdealGasSimulation.Instance;
-        float T=sim.GetTemperature();
-        float maxT=sim.GetMaxTemperature();
-        float P=sim.GetPressure();
-        float maxP=sim.GetMaxPressure();
-
-        //温度过高时禁止改变状态
-        bool tempBlocked = T >= maxT;
-
-        //压强过大时禁止改变状态
-        bool pressureBlocked = P >= maxP;
-
-        return (tempBlocked || pressureBlocked);
-    }
-
-
-
-
-
     #region 鼠标拖拽
     public void OnPointerDown(PointerEventData eventData)
     {
@@ -108,8 +86,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         pointerDown = true;
         isDragging = false;
         accumulatedDrag = 0f;
-        initialY = eventData.pressPosition.y;
-        initialPistonY = piston.localPosition.y;
+        OnInteractionStateChanged?.Invoke(true);
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -194,6 +171,7 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         isDragging = false;
         pointerDown = false;
         accumulatedDrag = 0f;
+        OnInteractionStateChanged?.Invoke(false);
     }
 
     #endregion
@@ -309,6 +287,10 @@ public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandl
         return volumeChangeRate < 0.01f; // 变化小于0.01L/秒视为稳定
     }
     
+    public float GetVolumeChangeRate()
+    {
+        return volumeChangeRate; 
+    }
 
     public bool GetPistonDragged()
     {

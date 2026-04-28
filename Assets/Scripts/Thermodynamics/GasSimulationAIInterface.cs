@@ -36,7 +36,7 @@ public  class GasSimulationAIInterface : MonoBehaviour
     public float GetMaxPressure() { return gasSimulation.GetMaxPressure(); }// 获取最大压力
     public ProcessType GetCurrentProcess() { return gasSimulation.GetCurrentProcess(); }// 获取当前过程
     public List<DataCollector.DataPoint> GetGraphDataPoint(){ return dataCollector.GetDataPoints(); }// 获取图表数据点列表
-    public float GetPVAverageErrorPercentage(){ return dataCollector.GetAverageErrorPercentage(); }// 获取PV乘积平均误差百分比
+    public float GetPVAverageErrorPercentage(){ return dataCollector.GetPVAverageErrorPercentage(); }// 获取PV乘积平均误差百分比
     public float GetVTAverageErrorPercentage(){ return dataCollector.GetVTAverageErrorPercentage(); }// 获取VT乘积平均误差百分比
     public float GetPTAverageErrorPercentage(){ return dataCollector.GetPTAverageErrorPercentage(); }// 获取PT乘积平均误差百分比
 
