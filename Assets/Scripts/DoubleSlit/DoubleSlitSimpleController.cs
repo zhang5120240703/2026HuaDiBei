@@ -24,12 +24,16 @@ public class DoubleSlitSimpleController : MonoBehaviour
 
     public bool IsFrontView => _isFrontView;// 供外部查询当前是否为前视相机视角
 
-    public enum ExperimentStep { Setup, Observe, Measure }
+    public enum ExperimentStep { Setup, Observe, Measure, Success }
     private ExperimentStep _step = ExperimentStep.Setup;
     private bool _paramsValid = false;
     private float _measuredDeltaX = 0f;
     private float _theoreticalDx = 0f;
     private float _error = 0f;
+    private float _currentWavelength = 632.8f;
+    private float _currentSlitDistance = 0.1f;
+    public float CurrentWavelength => _currentWavelength;
+    public float CurrentSlitDistance => _currentSlitDistance;
     // 预先计算Shader属性ID，避免运行时字符串查找开销
     static readonly int s_Emission = Shader.PropertyToID("_EmissionColor");
     // 供外部查询当前实验阶段、参数有效性、测量结果等状态
@@ -61,6 +65,8 @@ public class DoubleSlitSimpleController : MonoBehaviour
 
     public void SetParameters(float wavelength, float slitDistance)
     {
+        _currentWavelength = wavelength;
+        _currentSlitDistance = slitDistance;
         float screenDistance = GetActualScreenDistance();
         Log($"[SetParameters] λ={wavelength} d={slitDistance} L={screenDistance:F3}(自动)");
         if (lutGenerator == null) { Log("  ✗ lutGenerator 为空!"); ShowHint("⚠ 未找到 LUT 生成器！"); return; }
@@ -156,6 +162,44 @@ public class DoubleSlitSimpleController : MonoBehaviour
                + (_error < 10f ? $"✅ 误差 {_error:F1}%，通过！" : $"⚠ 误差 {_error:F1}%，请重测"));
     }
 
+    public void ValidateForSuccess(float playerTheoryDx, float measuredDx, float tolerancePercent = 15f)
+    {
+        Log($"[ValidateForSuccess] playerTheory={playerTheoryDx:F3}, measured={measuredDx:F3}, tolerance={tolerancePercent:F0}%");
+
+        if (_step != ExperimentStep.Measure)
+        {
+            ShowHint("⚠ 请先进入测量阶段！");
+            return;
+        }
+
+        _measuredDeltaX = measuredDx;
+        float correctTh = TheoreticalDeltaX;
+
+        float theoryError = correctTh > 0f ? Mathf.Abs(playerTheoryDx - correctTh) / correctTh * 100f : 0f;
+        float measuredError = correctTh > 0f ? Mathf.Abs(measuredDx - correctTh) / correctTh * 100f : 0f;
+
+        _error = measuredError;
+        if (formulaCalculator != null) formulaCalculator.CalculateError(measuredDx, correctTh);
+
+        Log($"  theoryError={theoryError:F1}%, measuredError={measuredError:F1}%");
+
+        if (theoryError <= tolerancePercent && measuredError <= tolerancePercent)
+        {
+            _step = ExperimentStep.Success;
+            Log("  → _step = Success");
+            ShowHint("🎉 恭喜！实验成功！\n理论计算与实验测量结果均正确！\n\n点击「重新实验」可再次挑战。");
+        }
+        else
+        {
+            string msg = "❌ 验证未通过：\n";
+            if (theoryError > tolerancePercent)
+                msg += $"  · 理论Δx误差 {theoryError:F1}%（需 ≤{tolerancePercent:F0}%）\n";
+            if (measuredError > tolerancePercent)
+                msg += $"  · 测量Δx误差 {measuredError:F1}%（需 ≤{tolerancePercent:F0}%）";
+            ShowHint(msg);
+        }
+    }
+
     public void ToggleFrontViewCamera()
     {
         if (mainCamera == null || frontViewCamera == null)
@@ -233,7 +277,7 @@ public class DoubleSlitSimpleController : MonoBehaviour
     private void OnBenchSetupInvalid()
     {
         Log($"[OnBenchSetupInvalid] _step={_step}");
-        if (_step != ExperimentStep.Setup)
+        if (_step != ExperimentStep.Setup && _step != ExperimentStep.Success)
         {
             _step = ExperimentStep.Setup;
             ShowStage2Objects(false);
