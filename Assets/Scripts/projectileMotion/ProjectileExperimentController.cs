@@ -168,8 +168,9 @@ public class ProjectileExperimentController : MonoBehaviour
 
     private void Awake()
     {
-        // 将参数初始化为 Inspector 默认值
         ResetParamsToDefault();
+        ExperimentStateManager.Instance?.ResetExperiment();
+        SimulationDataBuffer.ClearData();
     }
 
     private void Start()
@@ -190,11 +191,10 @@ public class ProjectileExperimentController : MonoBehaviour
     {
         yield return null;
 
-        // 获取 FlowController 引用
         if (UserActionManager.Instance != null)
         {
             _flowController = UserActionManager.Instance.GetFlowController();
-            // ★ Bug3 Fix: 用字段缓存 handler，OnDestroy 才能正确解绑
+            _flowController.ResetFlow();
             _flowErrorHandler = msg => OnFlowError?.Invoke(msg);
             _flowController.OnFlowError += _flowErrorHandler;
         }
@@ -204,24 +204,39 @@ public class ProjectileExperimentController : MonoBehaviour
                              "步骤跳转将依赖内部直接状态切换。");
         }
 
-        // 自动查找小球控制器
-        if (ballController == null)
-            ballController = FindObjectOfType<ProjectileBallController>();
+        yield return FindBallController();
 
-        // ★ Bug2 Fix: 禁用 ballController 的自动播放，避免 DoStep3 直接调用 PlayAnimation 后
-        //   ballController 的 OnStepChanged(Step3) 再触发一次 WaitAndPlay，导致动画被重启
         if (ballController != null)
+        {
             ballController.autoPlayOnStep3 = false;
+            ballController.ResetBall();
+        }
 
-        // 启动主实验循环（支持 Reset 后重跑）
         StartCoroutine(MainExperimentLoop());
+    }
+
+    private IEnumerator FindBallController()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            if (ballController == null)
+                ballController = FindObjectOfType<ProjectileBallController>(true);
+            if (ballController != null)
+            {
+                Debug.Log($"[ExperimentController] 找到 ballController (尝试 {i + 1} 次)");
+                yield break;
+            }
+            yield return null;
+        }
+        Debug.LogError("[ExperimentController] 连续 10 帧未找到 ProjectileBallController！请检查场景中是否包含该组件。");
     }
 
     private void OnDestroy()
     {
-        // ★ Bug3 Fix: 使用缓存的 handler 字段解绑，而非重新创建 lambda（新 lambda 不等于已绑定的实例）
         if (_flowController != null && _flowErrorHandler != null)
             _flowController.OnFlowError -= _flowErrorHandler;
+
+        Debug.Log("[ExperimentController] OnDestroy：已清理单例事件订阅。");
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -602,7 +617,18 @@ public class ProjectileExperimentController : MonoBehaviour
         // ── 3. 启动状态机 + 驱动小球动画 ────────────────────────────
         _stateManager.StartExperiment();      // Idle → Running
         _inStep3Sim = true;
-        ballController?.PlayAnimation();      // 开始沿轨迹移动（autoPlayOnStep3 已关闭，此处是唯一触发点）
+
+        if (ballController == null)
+        {
+            ballController = FindObjectOfType<ProjectileBallController>(true);
+        }
+        if (ballController == null)
+        {
+            Debug.LogError("[ExperimentController] ballController 为 null，动画无法播放！强制跳过动画，切换至 Finished 绕过卡死。");
+            _stateManager.FinishExperiment();
+            yield break;
+        }
+        ballController.PlayAnimation();
 
         // ── 4. 立即推进到 Step4（Step4 前置条件要求 Running 状态）───
         bool ok = _flowController?.NextStep() ?? true;
