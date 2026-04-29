@@ -2387,7 +2387,11 @@ GameObject:
   - component: {fileID: 8197030466281803910}
   - component: {fileID: 8722742129257463076}
   m_Layer: 5
+<<<<<<< HEAD:Assets/Art/Prefebs/AI提问.prefab
   m_Name: Placeholder
+=======
+  m_Name: "AI\u63D0\u95EECanvas"
+>>>>>>> origin/master:Assets/Art/Prefebs/AI提问Canvas.prefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
