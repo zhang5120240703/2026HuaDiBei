@@ -12,7 +12,7 @@ using UnityEngine.Events;
 ///   左键拖拽          → 在水平 XZ 平面内移动（沿光具座前后 + 左右微调）
 ///   拖拽时滚轮        → 调节高度（Y 轴）
 ///   Shift + 左键拖拽  → 纯高度调节（Y 轴），鼠标上下对应升降
-///   Ctrl  + 左键拖拽  → 纯 X 轴平移（左右对准光轴）
+///   Ctrl  + 左键拖拽  → 纯 Z 轴平移（沿光具座前后拖动）
 ///
 /// ══ 核心技术 ══
 ///   使用"屏幕空间增量"方案代替平面射线法：
@@ -153,7 +153,7 @@ public class ExperimentBenchManager : MonoBehaviour
 
     public enum BenchAxisChoice { Forward, Right, Up }// 光具座轴线选项（默认 Forward = +Z 轴）
 
-    private enum DragMode { XZ, YOnly, XOnly }// 拖拽模式（根据修饰键切换）
+    private enum DragMode { XZ, YOnly, XOnly, ZOnly }// 拖拽模式（根据修饰键切换）
 
     // ══════════════════════════════════════════════
     //  私有字段
@@ -193,7 +193,7 @@ public class ExperimentBenchManager : MonoBehaviour
     void Start()
     {
         if (enableStepGuide)
-            onHintMessage?.Invoke("💡 左键拖拽移动器材(XZ)  |  拖拽时滚轮调整高度  |  Shift拖拽=纯升降  |  Ctrl拖拽=纯左右");
+            onHintMessage?.Invoke("💡 左键拖拽移动器材(XZ)  |  拖拽时滚轮调整高度  |  Shift拖拽=纯升降  |  Ctrl拖拽=纯前后");
     }
 
     void Update()
@@ -250,7 +250,7 @@ public class ExperimentBenchManager : MonoBehaviour
 
         // ── 当前修饰键决定拖拽模式
         _dragMode = Input.GetKey(KeyCode.LeftShift) ? DragMode.YOnly
-                  : Input.GetKey(KeyCode.LeftControl) ? DragMode.XOnly
+                  : Input.GetKey(KeyCode.LeftControl) ? DragMode.ZOnly
                   : DragMode.XZ;
         _debugDragMode = _dragMode.ToString();
 
@@ -291,13 +291,11 @@ public class ExperimentBenchManager : MonoBehaviour
         {
             newPos.y += mouseDelta.y * worldPerPx * ySensitivity;
         }
-        // ── 纯 X 轴（Ctrl）
-        else if (_dragMode == DragMode.XOnly)
+        // ── 纯 Z 轴（Ctrl，沿光具座前后拖动）
+        else if (_dragMode == DragMode.ZOnly)
         {
-            Vector3 camRight = _cam.transform.right; camRight.y = 0f;
-            if (camRight.sqrMagnitude < 0.01f) camRight = Vector3.right;
-            else camRight.Normalize();
-            newPos += camRight * mouseDelta.x * worldPerPx * xzSensitivity;
+            Vector3 benchDir = BenchDir;
+            newPos += benchDir * mouseDelta.y * worldPerPx * xzSensitivity;
         }
 
         // ── 限制到 3D 边界
@@ -522,7 +520,7 @@ public class ExperimentBenchManager : MonoBehaviour
         {
             float diff = pos.x - opticalAxisX;
             onHintMessage?.Invoke($"↔ {released.displayName} 横向偏差 {dx * 100f:F1}cm " +
-                                  (diff > 0 ? "（偏右，Ctrl拖拽向左）" : "（偏左，Ctrl拖拽向右）"));
+                                  (diff > 0 ? "（偏右，左键拖拽向左微调）" : "（偏左，左键拖拽向右微调）"));
             return;
         }
 

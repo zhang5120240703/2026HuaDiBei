@@ -32,6 +32,7 @@ public class WaveFieldVisualizer : MonoBehaviour
     static readonly int P_Brt = Shader.PropertyToID("_Brightness");
     static readonly int P_Col = Shader.PropertyToID("_WaveColor");
     static readonly int P_Ph = Shader.PropertyToID("_ShowPhase");
+    static readonly int P_ClipX = Shader.PropertyToID("_ClipX");
 
     private Material _mat;
     private ExperimentBenchManager _bench;
@@ -40,7 +41,7 @@ public class WaveFieldVisualizer : MonoBehaviour
     {
         _mat = GetComponent<Renderer>().material;
         AutoFindTransforms();
-        SyncShader();
+        SyncAll();
     }
 
     void Start()
@@ -48,8 +49,12 @@ public class WaveFieldVisualizer : MonoBehaviour
         if (_bench == null) AutoFindTransforms();
     }
 
-    void Update() => SyncShader();
-    void OnValidate() => SyncShader();
+    void Update()
+    {
+        SyncClip();
+        SyncColor();
+    }
+    void OnValidate() => SyncAll();
 
     private void AutoFindTransforms()
     {
@@ -65,7 +70,7 @@ public class WaveFieldVisualizer : MonoBehaviour
             screenTransform = _bench.screen.transform;
     }
 
-    void SyncShader()
+    void SyncAll()
     {
         if (_mat == null)
         {
@@ -105,6 +110,8 @@ public class WaveFieldVisualizer : MonoBehaviour
         Vector3 s = transform.localScale;
         float aspect = s.x / Mathf.Max(s.y, 0.0001f);
 
+        SyncClip();
+
         float halfSep = Mathf.Clamp(slitSepToPlaneHeightRatio, 0.02f, 0.48f) * 0.5f;
         _mat.SetFloat(P_S1Y, 0.5f + halfSep);
         _mat.SetFloat(P_S2Y, 0.5f - halfSep);
@@ -116,6 +123,20 @@ public class WaveFieldVisualizer : MonoBehaviour
         _mat.SetFloat(P_Brt, brightness);
         _mat.SetFloat(P_Ph, phaseWaveMode ? 1f : 0f);
 
+        SyncColor();
+    }
+
+    void SyncClip()
+    {
+        if (_mat == null || screenTransform == null) return;
+        Vector3 localScreen = transform.InverseTransformPoint(screenTransform.position);
+        float clipUVX = Mathf.Clamp01(localScreen.x + 0.5f);
+        _mat.SetFloat(P_ClipX, clipUVX);
+    }
+
+    void SyncColor()
+    {
+        if (_mat == null || lutGenerator == null) return;
         Color col = lutGenerator.isWhiteLight ? Color.white : WlToColor(lutGenerator.wavelength);
         _mat.SetColor(P_Col, col);
     }

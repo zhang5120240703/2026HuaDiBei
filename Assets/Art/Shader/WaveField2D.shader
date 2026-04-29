@@ -12,6 +12,8 @@ Shader "Custom/WaveField2D"
         _WaveColor ("Wave Color", Color)             = (1,1,0.3,1)
         [Toggle] _ShowPhase ("Phase Wave Mode", Float) = 0
 
+        [HideInInspector] _ClipX ("Clip UV.X", Float) = 1.0
+
         // 拖拽视觉反馈（由 ExperimentItem.SetVS 通过 MaterialPropertyBlock 写入）
         _EmissionColor  ("Emission Color", Color)              = (0,0,0,1)
     }
@@ -34,7 +36,7 @@ Shader "Custom/WaveField2D"
             struct v2f    { float4 vertex : SV_POSITION; float2 uv : TEXCOORD0; };
 
             float  _Slit1Y, _Slit2Y, _VisualK, _Aspect;
-            float  _TimeScale, _Brightness, _ShowPhase;
+            float  _TimeScale, _Brightness, _ShowPhase, _ClipX;
             fixed4 _WaveColor;
             float4 _EmissionColor;
 
@@ -56,6 +58,9 @@ Shader "Custom/WaveField2D"
                 // ֻ��Ⱦ˫���Ҳ����򣨹⴫������
                 float fadeIn = smoothstep(0.0, 0.02 * _Aspect, p.x);
                 if (fadeIn < 0.001) return fixed4(0,0,0,0);
+
+                // �ڹ�Ļλ�ý�ֹ��������Ļ�Ҳ��ͼ��
+                clip(_ClipX - i.uv.x);
 
                 float r1 = distance(p, s1);
                 float r2 = distance(p, s2);
