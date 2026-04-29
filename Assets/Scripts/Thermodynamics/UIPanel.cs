@@ -328,6 +328,7 @@ public class UIPanel : MonoBehaviour
                 resultText += "• 多个数据点是在刚稳定时采集的，操作节奏偏快\n";
             }
 
+
             resultText += "\n建议：每次调整后稍作停顿，并让 8 个点覆盖更大的变化范围。";
         }
 
