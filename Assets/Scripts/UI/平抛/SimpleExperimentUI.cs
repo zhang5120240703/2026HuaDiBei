@@ -43,6 +43,7 @@ public class SimpleExperimentUI : MonoBehaviour
 
     void Start()
     {
+        Debug.Log($"[SimpleExperimentUI] Start 执行, gameObject={gameObject.name}, enabled={enabled}");
         _ctrl = FindObjectOfType<ProjectileExperimentController>();
         if (_ctrl == null)
         {
@@ -54,7 +55,13 @@ public class SimpleExperimentUI : MonoBehaviour
         BindControllerEvents();
         InitUI();
 
-        StartCoroutine(DelayedReset());
+        // 强制显示 Step1 并激活按钮
+        ShowStepPanel(0);
+        btnPause.interactable = true;
+        btnResume.interactable = true;
+        btnReset.interactable = true;
+        btnConfirmStep1.interactable = true;
+        Debug.Log($"[SimpleExperimentUI] btnConfirmStep1.interactable={btnConfirmStep1.interactable}");
     }
 
     IEnumerator DelayedReset()
@@ -87,6 +94,8 @@ public class SimpleExperimentUI : MonoBehaviour
 
     void BindButtons()
     {
+        Debug.Log($"[SimpleExperimentUI] BindButtons: btnPause={btnPause != null}, btnConfirmStep1={btnConfirmStep1 != null}");
+     
         btnPause.onClick.AddListener(() => _ctrl?.RequestPause());
         btnResume.onClick.AddListener(() => _ctrl?.RequestResume());
         btnReset.onClick.AddListener(() => _ctrl?.RequestReset());
