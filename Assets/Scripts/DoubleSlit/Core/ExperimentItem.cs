@@ -7,7 +7,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class ExperimentItem : MonoBehaviour
 {
-    public enum ApparatusType { LightSource = 0, SingleSlit = 1, DoubleSlit = 2, Screen = 3 }
+    public enum ApparatusType { LightSource = 0, SingleSlit = 1, DoubleSlit = 2, Screen = 3, Lens = 4 }
 
     // ══════════════════════════════════════════════
     //  Inspector

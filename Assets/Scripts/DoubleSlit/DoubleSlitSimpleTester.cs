@@ -15,7 +15,9 @@ public class DoubleSlitSimpleTester : MonoBehaviour
     [Range(380f, 780f)] public float wavelength = 632.8f;
     [Range(0.01f, 1f)] public float slitDistance = 0.1f;
     public float measuredDeltaX = 0.63f;
+    public float playerTheoryDeltaX = 0f;
     private string _measureInput = "0.63";
+    private string _theoryInput = "";
 
     // ── 运行时 ─────────────────────────────────────────────────
     private string _log = "";
@@ -169,67 +171,130 @@ public class DoubleSlitSimpleTester : MonoBehaviour
         Div();
 
         // ── 步骤 3 ─────────────────────────────────────────────
-        StepHead("③ 测量条纹", step == DoubleSlitSimpleController.ExperimentStep.Measure);
-
-        if (hasCtrl)
-        {
-            bool hasMeasTool = Ctrl().measurementTool != null;
-            if (hasMeasTool)
-            {
-                GUI.color = new Color(0.3f, 0.9f, 1f);
-                GUILayout.Label("🔬 读数显微镜测量：", _sBold);
-                GUI.color = Color.white;
-                GUILayout.Space(2);
-            }
-            else
-            {
-                GUI.color = new Color(1f, 0.6f, 0.2f);
-                GUILayout.Label("⚠ 测量工具未配置", _sBold);
-                GUI.color = Color.white;
-                GUILayout.Space(2);
-            }
-        }
-
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Δx = ", _sBold, GUILayout.Width(36));
-        string prevInput = _measureInput;
-        _measureInput = GUILayout.TextField(_measureInput, _sTextField, GUILayout.Width(70));
-        if (_measureInput != prevInput)
-        {
-            if (float.TryParse(_measureInput, out float val))
-                measuredDeltaX = Mathf.Clamp(val, 0.01f, 20f);
-        }
-        GUILayout.Label(" mm", _sBold);
-        GUILayout.EndHorizontal();
+        StepHead("③ 理论计算 & 测量验证", step == DoubleSlitSimpleController.ExperimentStep.Measure);
 
         if (hasCtrl)
         {
             float th = Ctrl().TheoreticalDeltaX;
-            float err = th > 0f ? Mathf.Abs(measuredDeltaX - th) / th * 100f : 0f;
-            GUI.color = err < 5f ? new Color(0.3f, 1f, 0.5f)
-                      : err < 15f ? new Color(1f, 0.85f, 0.2f)
-                      : new Color(1f, 0.3f, 0.3f);
-            GUILayout.Label($"  理论值 {th:F3} mm | 误差 {err:F1}%", _sLabel);
+
+            GUI.color = new Color(0.3f, 0.9f, 1f);
+            GUILayout.Label("📐 理论计算（使用 Δx = λL/d 计算理论值）", _sBold);
             GUI.color = Color.white;
+            GUILayout.Space(2);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("理论 Δx = ", _sBold, GUILayout.Width(72));
+            string prevTheory = _theoryInput;
+            _theoryInput = GUILayout.TextField(_theoryInput, _sTextField, GUILayout.Width(70));
+            if (_theoryInput != prevTheory)
+            {
+                if (float.TryParse(_theoryInput, out float val))
+                    playerTheoryDeltaX = Mathf.Clamp(val, 0.01f, 100f);
+            }
+            GUILayout.Label(" mm", _sBold);
+            GUILayout.EndHorizontal();
 
             GUI.color = CDm;
-            GUILayout.Label($"  预期范围: {th * 0.8f:F2} ~ {th * 1.2f:F2} mm (±20%)", _sLabel);
+            GUILayout.Label($"  正确理论值 ≈ {th:F3} mm", _sLabel);
+            GUI.color = Color.white;
+
+            GUILayout.Space(8);
+
+            GUI.color = new Color(0.3f, 0.9f, 1f);
+            GUILayout.Label("📏 实验测量（使用读数显微镜测量条纹间距）", _sBold);
+            GUI.color = Color.white;
+            GUILayout.Space(2);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("测量 Δx = ", _sBold, GUILayout.Width(72));
+            string prevInput = _measureInput;
+            _measureInput = GUILayout.TextField(_measureInput, _sTextField, GUILayout.Width(70));
+            if (_measureInput != prevInput)
+            {
+                if (float.TryParse(_measureInput, out float val))
+                    measuredDeltaX = Mathf.Clamp(val, 0.01f, 20f);
+            }
+            GUILayout.Label(" mm", _sBold);
+            GUILayout.EndHorizontal();
+
+            float measErr = th > 0f ? Mathf.Abs(measuredDeltaX - th) / th * 100f : 0f;
+            GUI.color = measErr < 5f ? new Color(0.3f, 1f, 0.5f)
+                      : measErr < 15f ? new Color(1f, 0.85f, 0.2f)
+                      : new Color(1f, 0.3f, 0.3f);
+            GUILayout.Label($"  误差 {measErr:F1}%（需 ≤15%）", _sLabel);
             GUI.color = Color.white;
         }
-        GUILayout.Space(4);
-
-        bool canRecord = hasCtrl && step == DoubleSlitSimpleController.ExperimentStep.Measure;
-        GUI.enabled = canRecord;
-        GUI.color = canRecord ? new Color(0.3f, 1f, 0.5f) : Color.gray;
-        if (Btn("提交测量结果  ✓"))
+        else
         {
-            Ctrl().RecordMeasurement(measuredDeltaX);
+            GUI.color = new Color(1f, 0.6f, 0.2f);
+            GUILayout.Label("⚠ 控制器未连接", _sBold);
+            GUI.color = Color.white;
+        }
+        GUILayout.Space(6);
+
+        bool canValidate = hasCtrl && step == DoubleSlitSimpleController.ExperimentStep.Measure;
+        GUI.enabled = canValidate;
+        GUI.color = canValidate ? new Color(0.3f, 1f, 0.5f) : Color.gray;
+        if (Btn("验证并完成实验  🎯"))
+        {
+            Ctrl().ValidateForSuccess(playerTheoryDeltaX, measuredDeltaX);
             Refresh();
         }
         GUI.color = Color.white;
         GUI.enabled = true;
 
         Div();
+
+        // ── 步骤 4：成功 ──────────────────────────────────────
+        if (step == DoubleSlitSimpleController.ExperimentStep.Success)
+        {
+            GUILayout.Space(8);
+            GUI.color = new Color(0.3f, 1f, 0.5f);
+            GUILayout.Label("🎉  恭喜实验成功！", _sTitle);
+            GUI.color = Color.white;
+            GUILayout.Space(6);
+
+            float th = hasCtrl ? Ctrl().TheoreticalDeltaX : 0f;
+            float theoryErr = th > 0f ? Mathf.Abs(playerTheoryDeltaX - th) / th * 100f : 0f;
+            float measErr = th > 0f ? Mathf.Abs(measuredDeltaX - th) / th * 100f : 0f;
+
+            GUI.color = new Color(0.3f, 1f, 0.5f);
+            GUILayout.Label("✅ 理论计算通过", _sBold);
+            GUI.color = Color.white;
+            GUILayout.Label($"  你的答案：{playerTheoryDeltaX:F3} mm", _sLabel);
+            GUILayout.Label($"  正确值：{th:F3} mm", _sLabel);
+            GUILayout.Label($"  误差：{theoryErr:F1}%", _sLabel);
+            GUILayout.Space(4);
+
+            GUI.color = new Color(0.3f, 1f, 0.5f);
+            GUILayout.Label("✅ 实验测量通过", _sBold);
+            GUI.color = Color.white;
+            GUILayout.Label($"  测量结果：{measuredDeltaX:F3} mm", _sLabel);
+            GUILayout.Label($"  正确值：{th:F3} mm", _sLabel);
+            GUILayout.Label($"  误差：{measErr:F1}%", _sLabel);
+            GUILayout.Space(8);
+
+            GUI.color = CAc;
+            GUILayout.Label("💡 双缝干涉公式：Δx = λL / d", _sLabel);
+            if (hasCtrl)
+            {
+                GUILayout.Label($"  其中 λ={Ctrl().CurrentWavelength:F0}nm, d={Ctrl().CurrentSlitDistance:F3}mm", _sLabel);
+            }
+            GUI.color = Color.white;
+
+            GUILayout.Space(10);
+
+            GUI.enabled = hasCtrl;
+            GUI.color = new Color(1f, 0.6f, 0.2f);
+            if (Btn("🔄 重新实验"))
+            {
+                if (hasCtrl) { Ctrl().ResetExperiment(); Refresh(); }
+            }
+            GUI.color = Color.white;
+            GUI.enabled = true;
+
+            Div();
+        }
 
         // ── 控制 ──────────────────────────────────────────────
         GUILayout.BeginHorizontal();
@@ -259,24 +324,39 @@ public class DoubleSlitSimpleTester : MonoBehaviour
     {
         if (Ctrl() == null) return;
         wavelength = 632.8f; slitDistance = 0.1f;
-        measuredDeltaX = 6.328f;
-        _measureInput = "6.328";
         Ctrl().ResetExperiment();
         Ctrl().SetParameters(wavelength, slitDistance);
         Ctrl().ConfirmParameters();
         Ctrl().StartMeasurement();
-        Ctrl().RecordMeasurement(measuredDeltaX);
+
+        float th = Ctrl().TheoreticalDeltaX;
+        playerTheoryDeltaX = th;
+        _theoryInput = th.ToString("F3");
+        measuredDeltaX = th;
+        _measureInput = th.ToString("F3");
+        Ctrl().ValidateForSuccess(playerTheoryDeltaX, measuredDeltaX);
         Refresh();
     }
 
     void Refresh()
     {
         if (Ctrl() == null) { _log = "❌ 控制器未找到"; return; }
-        _log = $"阶段：{StepName(Ctrl().CurrentStep)}\n"
-             + $"参数：{(Ctrl().IsParametersValid ? "✓ 有效" : "✗ 未设置")}\n"
-             + $"理论 Δx = {Ctrl().TheoreticalDeltaX:F3} mm\n"
-             + $"测量 Δx = {Ctrl().MeasuredDeltaX:F3} mm\n"
-             + $"误差    = {Ctrl().CurrentError:F1}%";
+        var step = Ctrl().CurrentStep;
+        if (step == DoubleSlitSimpleController.ExperimentStep.Success)
+        {
+            _log = $"🎉 实验成功完成！\n"
+                 + $"理论 Δx(你的答案) = {playerTheoryDeltaX:F3} mm\n"
+                 + $"测量 Δx(实验结果) = {measuredDeltaX:F3} mm\n"
+                 + $"正确理论值 = {Ctrl().TheoreticalDeltaX:F3} mm";
+        }
+        else
+        {
+            _log = $"阶段：{StepName(step)}\n"
+                 + $"参数：{(Ctrl().IsParametersValid ? "✓ 有效" : "✗ 未设置")}\n"
+                 + $"正确理论 Δx = {Ctrl().TheoreticalDeltaX:F3} mm\n"
+                 + $"测量 Δx = {Ctrl().MeasuredDeltaX:F3} mm\n"
+                 + $"误差    = {Ctrl().CurrentError:F1}%";
+        }
     }
 
     // ── 小工具 ────────────────────────────────────────────────
@@ -308,7 +388,8 @@ public class DoubleSlitSimpleTester : MonoBehaviour
     {
         DoubleSlitSimpleController.ExperimentStep.Setup => "参数设置",
         DoubleSlitSimpleController.ExperimentStep.Observe => "观察图样",
-        DoubleSlitSimpleController.ExperimentStep.Measure => "测量条纹",
+        DoubleSlitSimpleController.ExperimentStep.Measure => "理论计算 & 测量验证",
+        DoubleSlitSimpleController.ExperimentStep.Success => "实验成功 🎉",
         _ => "未知"
     };
 

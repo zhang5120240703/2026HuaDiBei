@@ -30,6 +30,7 @@ public class ExperimentBenchManager : MonoBehaviour
     public ExperimentItem lightSource;
     public ExperimentItem singleSlit;
     public ExperimentItem doubleSlit;
+    public ExperimentItem lens;
     public ExperimentItem screen;
 
     // ══════════════════════════════════════════════
@@ -105,6 +106,7 @@ public class ExperimentBenchManager : MonoBehaviour
     public Vector3 snapPosLight = new Vector3(0f, 1.05f, -2.2f);
     public Vector3 snapPosSingle = new Vector3(0f, 1.05f, -0.9f);
     public Vector3 snapPosDouble = new Vector3(0f, 1.05f, 0.1f);
+    public Vector3 snapPosLens = new Vector3(0f, 1.05f, -1.5f);
     public Vector3 snapPosScreen = new Vector3(0f, 1.05f, 1.8f);
 
     // ══════════════════════════════════════════════
@@ -143,7 +145,7 @@ public class ExperimentBenchManager : MonoBehaviour
     [Header("── 调试（只读，运行时查看）──")]
     [SerializeField] private string _debugDragMode;
     [SerializeField] private Vector3 _debugDragPos;// 当前被拖拽物体的实时位置（世界坐标）
-    [SerializeField] private Vector3 _debugLightPos, _debugSSPos, _debugDSPos, _debugScrPos;// 各器材当前位置（世界坐标）
+    [SerializeField] private Vector3 _debugLightPos, _debugSSPos, _debugDSPos, _debugLensPos, _debugScrPos;// 各器材当前位置（世界坐标）
 
     // ══════════════════════════════════════════════
     //  枚举
@@ -180,7 +182,7 @@ public class ExperimentBenchManager : MonoBehaviour
 
         _expCtrl = FindObjectOfType<DoubleSlitSimpleController>();
 
-        _items = new[] { lightSource, singleSlit, doubleSlit, screen };
+        _items = new[] { lightSource, lens, singleSlit, doubleSlit, screen };
         for (int i = 0; i < _items.Length; i++)
             if (_items[i] == null)
                 Debug.LogError($"[BenchManager] 器材引用 [{i}] 为空，请在 Inspector 指定！");
@@ -414,12 +416,14 @@ public class ExperimentBenchManager : MonoBehaviour
         if (!AllAssigned()) { result.AddError("存在未指定的器材引用"); return result; }
 
         float lT = GetBenchT(lightSource.transform.position);
+        float lpT = GetBenchT(lens.transform.position);
         float ssT = GetBenchT(singleSlit.transform.position);
         float dsT = GetBenchT(doubleSlit.transform.position);
         float scT = GetBenchT(screen.transform.position);
 
         // 1. 顺序
-        if (lT >= ssT - orderMinGap) result.AddError($"❌ {lightSource.displayName} 需排在 {singleSlit.displayName} 前方");
+        if (lT >= lpT - orderMinGap) result.AddError($"❌ {lightSource.displayName} 需排在 {lens.displayName} 前方");
+        if (lpT >= ssT - orderMinGap) result.AddError($"❌ {lens.displayName} 需排在 {singleSlit.displayName} 前方");
         if (ssT >= dsT - orderMinGap) result.AddError($"❌ {singleSlit.displayName} 需排在 {doubleSlit.displayName} 前方");
         if (dsT >= scT - orderMinGap) result.AddError($"❌ {doubleSlit.displayName} 需排在 {screen.displayName} 前方");
 
@@ -533,7 +537,8 @@ public class ExperimentBenchManager : MonoBehaviour
                 onHintMessage?.Invoke(item.itemType switch
                 {
                     ExperimentItem.ApparatusType.LightSource => $"💡 {item.displayName} 需放到最前端",
-                    ExperimentItem.ApparatusType.SingleSlit => $"🔲 {item.displayName} 需放到光源后方",
+                    ExperimentItem.ApparatusType.Lens => $"🔎 {item.displayName} 需放到光源后方",
+                    ExperimentItem.ApparatusType.SingleSlit => $"🔲 {item.displayName} 需放到透镜后方",
                     ExperimentItem.ApparatusType.DoubleSlit => $"🔳 {item.displayName} 需放到单缝后方",
                     ExperimentItem.ApparatusType.Screen => $"📺 {item.displayName} 需放到最末端",
                     _ => ""
@@ -624,10 +629,11 @@ public class ExperimentBenchManager : MonoBehaviour
 
     private void BuildSnapTargets()// 构建器材到推荐位置的字典
     {
-        _snapTargets = new Dictionary<ExperimentItem, Vector3>(4);// 注意：如果某个器材引用未指定，则不加入字典，避免后续使用时 NullReference 错误
+        _snapTargets = new Dictionary<ExperimentItem, Vector3>(5);
         if (lightSource != null) _snapTargets[lightSource] = snapPosLight;
         if (singleSlit != null) _snapTargets[singleSlit] = snapPosSingle;
         if (doubleSlit != null) _snapTargets[doubleSlit] = snapPosDouble;
+        if (lens != null) _snapTargets[lens] = snapPosLens;
         if (screen != null) _snapTargets[screen] = snapPosScreen;
     }
 
@@ -643,6 +649,7 @@ public class ExperimentBenchManager : MonoBehaviour
         _debugLightPos = lightSource.transform.position;
         _debugSSPos = singleSlit.transform.position;
         _debugDSPos = doubleSlit.transform.position;
+        _debugLensPos = lens.transform.position;
         _debugScrPos = screen.transform.position;
     }
 
@@ -671,6 +678,7 @@ public class ExperimentBenchManager : MonoBehaviour
             (snapPosLight,  Color.yellow),
             (snapPosSingle, Color.green),
             (snapPosDouble, Color.cyan),
+            (snapPosLens,   new Color(1f, 0.5f, 0f)), // 橙色
             (snapPosScreen, Color.red),
         };
         foreach (var (p, c) in marks)

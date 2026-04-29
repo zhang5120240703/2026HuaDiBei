@@ -166,6 +166,18 @@ public static class SimulationDataBuffer
     // ── 便捷查询方法 ─────────────────────────────────────────────────
 
     /// <summary>
+    /// 调试用：打印当前缓冲区状态快照
+    /// </summary>
+    public static void LogCurrentState()
+    {
+        Debug.Log($"[SimulationDataBuffer] 当前状态: " +
+                  $"HasValidData={HasValidData()}, " +
+                  $"PointCount={TrajectoryPointCount}, " +
+                  $"LocalOrigin={LocalOrigin}, " +
+                  $"HorizontalDistance={HorizontalDistance:F3}, YDistance={YDistance:F3}, TotalDistance={TotalDistance:F3}");
+    }
+
+    /// <summary>
     /// 判断当前是否存在有效轨迹数据。
     /// UI模块、AI模块、ProjectileBallController 在读取前建议先调用此方法。
     /// </summary>
