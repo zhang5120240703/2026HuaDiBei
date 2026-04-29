@@ -1,44 +1,22 @@
 using UnityEngine;
-using TMPro;
 using System.Collections;
 
 public class TeachingRuler_Final : MonoBehaviour
 {
-    [Header("直尺外观")]
-    public float rulerLength = 2.2f;
-    public float rulerWidth = 0.08f;
-    public float rulerThickness = 0.012f;
-    public Color rulerColor = new Color(1f, 0.95f, 0.7f);
-
-    [Header("刻度设置（平贴尺面，从右边缘向内）")]
-    public float majorTickInterval = 0.5f;
-    public float minorTickInterval = 0.1f;
-    public float majorTickLength = 0.045f;
-    public float minorTickLength = 0.03f;
-    public float tickWidth = 0.005f;
-
-    [Header("数字标签（位于刻度线内侧）")]
-    public float fontSize = 0.22f;
-    public float labelOffsetX = -0.035f;
-    public float labelOffsetY = 0.008f;
-    public Color labelColor = Color.black;
-
-    [Header("端点标记")]
-    public float endPointRadius = 0.08f;
-    public Color startColor = Color.red;
-    public Color endColor = Color.blue;
+    [Header("直尺模型引用")]
+    public Transform startPoint;         // 测量起点（空物体或子物体，位于直尺一端）
+    public Transform endPoint;           // 测量终点（空物体或子物体，位于直尺另一端）
+    public Collider rulerCollider;       // 直尺的碰撞体（用于拖拽检测，若为空则自动添加）
 
     [Header("交互速度（只能移动，不能旋转）")]
     public float moveSensitivity = 0.12f;
 
     [Header("相机聚焦")]
-    public Transform pendulumAnchor;
+    public Transform pendulumAnchor;     // 悬挂点（自动查找或手动指定）
     public float measureDistance = 3.8f;
     public float measureFOV = 42f;
     public float transitionDuration = 0.6f;   // 过渡动画时长
 
-    private Transform startPoint;
-    private Transform endPoint;
     private Camera mainCam;
 
     // 默认状态
@@ -73,8 +51,23 @@ public class TeachingRuler_Final : MonoBehaviour
             if (pendulum != null) pendulumAnchor = pendulum.transform;
         }
 
-        BuildRulerVisuals();
+        // 确保必填引用已赋值
+        if (startPoint == null || endPoint == null)
+        {
+            Debug.LogError("TeachingRuler_Final: 请指定 startPoint 和 endPoint！");
+            enabled = false;
+            return;
+        }
 
+        // 如果没有指定碰撞体，尝试从当前物体获取，若没有则添加一个 BoxCollider
+        if (rulerCollider == null)
+        {
+            rulerCollider = GetComponent<Collider>();
+            if (rulerCollider == null)
+                rulerCollider = gameObject.AddComponent<BoxCollider>();
+        }
+
+        // 记录初始状态（位置和旋转）
         defaultRulerPos = transform.position;
         defaultRulerRot = transform.rotation;
     }
@@ -84,74 +77,6 @@ public class TeachingRuler_Final : MonoBehaviour
         HandleMouseDragAndClick();
         if (Input.GetKeyDown(KeyCode.F) && !isTransitioning)
             StartCoroutine(ResetCameraAndRuler());
-    }
-
-    void BuildRulerVisuals()
-    {
-        while (transform.childCount > 0) DestroyImmediate(transform.GetChild(0).gameObject);
-
-        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        body.name = "RulerBody";
-        body.transform.SetParent(transform);
-        body.transform.localPosition = Vector3.zero;
-        body.transform.localScale = new Vector3(rulerWidth, rulerThickness, rulerLength);
-        body.GetComponent<Renderer>().material.color = rulerColor;
-        Destroy(body.GetComponent<Collider>());
-
-        startPoint = CreateSphere("StartPoint", new Vector3(0, 0, -rulerLength / 2), startColor);
-        endPoint = CreateSphere("EndPoint", new Vector3(0, 0, rulerLength / 2), endColor);
-
-        float halfLen = rulerLength / 2;
-        float surfaceY = rulerThickness / 2 + 0.0005f;
-        float rightEdgeX = rulerWidth / 2;
-
-        for (float pos = -halfLen; pos <= halfLen + 0.001f; pos += minorTickInterval)
-        {
-            bool isMajor = Mathf.Abs(Mathf.Round(pos / majorTickInterval) * majorTickInterval - pos) < 0.01f;
-            float tickLen = isMajor ? majorTickLength : minorTickLength;
-
-            GameObject tick = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            tick.transform.SetParent(transform);
-            tick.transform.localPosition = new Vector3(rightEdgeX - tickLen / 2, surfaceY, pos);
-            tick.transform.localScale = new Vector3(tickLen, 0.001f, tickWidth);
-            tick.GetComponent<Renderer>().material.color = Color.black;
-            Destroy(tick.GetComponent<Collider>());
-
-            if (isMajor && Mathf.Abs(pos) > 0.001f)
-            {
-                float lengthValue = pos + halfLen;
-                GameObject label = new GameObject("Label_" + lengthValue);
-                label.transform.SetParent(transform);
-                float labelX = rightEdgeX - tickLen + labelOffsetX;
-                label.transform.localPosition = new Vector3(labelX, surfaceY + labelOffsetY, pos);
-                TextMeshPro tmp = label.AddComponent<TextMeshPro>();
-                tmp.text = lengthValue.ToString("F1") + "m";
-                tmp.fontSize = fontSize;
-                tmp.alignment = TextAlignmentOptions.Center;
-                tmp.color = labelColor;
-                tmp.fontStyle = FontStyles.Bold;
-                if (tmp.font == null) tmp.font = TMP_Settings.defaultFontAsset;
-                label.AddComponent<FaceCamera>();
-            }
-        }
-
-        BoxCollider collider = gameObject.AddComponent<BoxCollider>();
-        collider.size = new Vector3(rulerWidth * 1.2f, rulerThickness * 1.2f, rulerLength);
-        collider.center = Vector3.zero;
-        foreach (var childCollider in GetComponentsInChildren<Collider>())
-            if (childCollider != collider) Destroy(childCollider);
-    }
-
-    Transform CreateSphere(string name, Vector3 localPos, Color color)
-    {
-        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        sphere.name = name;
-        sphere.transform.SetParent(transform);
-        sphere.transform.localPosition = localPos;
-        sphere.transform.localScale = Vector3.one * endPointRadius;
-        sphere.GetComponent<Renderer>().material.color = color;
-        Destroy(sphere.GetComponent<Collider>());
-        return sphere.transform;
     }
 
     void HandleMouseDragAndClick()
@@ -205,7 +130,6 @@ public class TeachingRuler_Final : MonoBehaviour
         Quaternion targetRulerRot = GetUprightRotation();
         Vector3 targetRulerPos = pendulumAnchor != null ? pendulumAnchor.position + new Vector3(1.2f, -1f, 0f) : defaultRulerPos;
 
-        // 起始状态
         Vector3 startCamPos = mainCam.transform.position;
         Quaternion startCamRot = mainCam.transform.rotation;
         float startFOV = mainCam.fieldOfView;
@@ -224,7 +148,6 @@ public class TeachingRuler_Final : MonoBehaviour
             elapsed += Time.deltaTime;
             yield return null;
         }
-        // 确保最终精确
         mainCam.transform.position = targetCam.position;
         mainCam.transform.rotation = targetCam.rotation;
         mainCam.fieldOfView = targetFOV;
@@ -261,20 +184,14 @@ public class TeachingRuler_Final : MonoBehaviour
         transform.position = defaultRulerPos;
         transform.rotation = defaultRulerRot;
 
-        hasBeenUpright = false;   // 允许下次单击再次竖立
+        hasBeenUpright = false;
         isTransitioning = false;
     }
 
     Quaternion GetUprightRotation()
     {
-        Quaternion baseRot = Quaternion.Euler(90f, 0f, 0f);
-        if (pendulumAnchor == null) return baseRot;
-        Vector3 toAnchor = (pendulumAnchor.position - transform.position).normalized;
-        Vector3 horizontalDir = new Vector3(toAnchor.x, 0, toAnchor.z).normalized;
-        if (horizontalDir == Vector3.zero) return baseRot;
-        Vector3 defaultRight = baseRot * Vector3.right;
-        float angle = Vector3.SignedAngle(defaultRight, horizontalDir, Vector3.up);
-        return Quaternion.AngleAxis(angle, Vector3.up) * baseRot;
+        // 基础旋转：使直尺竖直。假设直尺平放时，长度方向为局部 Z 轴，宽度方向（刻度侧）为局部 X 轴。
+        return Quaternion.Euler(0f, -90f, 90f);
     }
 
     CameraState GetMeasureCameraTransform()
@@ -308,19 +225,5 @@ public class TeachingRuler_Final : MonoBehaviour
         public Vector3 position;
         public Quaternion rotation;
         public CameraState(Vector3 pos, Quaternion rot) { position = pos; rotation = rot; }
-    }
-}
-
-/// <summary>
-/// 始终面向摄像机（用于文字标签）
-/// </summary>
-public class FaceCamera : MonoBehaviour
-{
-    void LateUpdate()
-    {
-        Camera cam = Camera.main;
-        if (cam != null)
-            transform.LookAt(transform.position + cam.transform.rotation * Vector3.forward,
-                             cam.transform.rotation * Vector3.up);
     }
 }
