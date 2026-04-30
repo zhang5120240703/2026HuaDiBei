@@ -1,300 +1,1217 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.EventSystems;
-using static UnityEngine.GraphicsBuffer;
+using UnityEngine.UI;
 
 /// <summary>
-/// 气缸控制器，负责处理活塞的拖动和体积计算
+/// Controls piston dragging, volume mapping, and piston synchronization with gas state changes.
 /// </summary>
 public class CylinderController : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
-    public Transform piston; // 活塞的Transform组件
+    [Header("References")]
+    public Transform piston;
+    [SerializeField] private Transform syringe;
+    [SerializeField] private Transform pistonTopColumn;
 
-    public float cylinderHeight = 2.0f; // 气缸高度（对应2.0L体积）
-    public float minHeight = 0.2f; // 最小高度（对应0.0L体积）
-    public float maxHeight = 2.0f; // 最大高度（对应2.0L体积）
-    
-    private bool isDragging = false;
-    private bool canDrag = false; // 是否允许拖动（根据过程类型限制）
-    private float lastVolume; // 上一次记录的体积
-    private float volumeChangeRate; // 体积变化率
-    private float lastChangeTime; // 上一次变化时间
-    
-    private const float sensitivity = 0.001f; // 鼠标移动转换为活塞移动的灵敏度
-    private float dragStartThreshold = 5f; // 像素级阈值，防止点击也触发移动
-    private bool pointerDown = false; // 标记是否按下但尚未达到拖动阈值
-    private bool blockedByPressure = false; // 当压强过大时阻止新的拖动
-
-    // 累计位移，用于判断拖动阈值；限制每帧最大位移，防止快速拖拽一次性跳到顶端
-    private float accumulatedDrag = 0f;
-    private const float maxStepFractionPerFrame = 0.25f; // 每帧允许移动的最大比例（相对于 cylinderHeight）
-
-    // 防止体积为0导致除零和允许的最小体积（可根据需求调整）
+    [Header("Volume Range (L)")]
+    public float cylinderHeight = 2.0f;
+    public float minHeight = 0.2f;
+    public float maxHeight = 2.0f;
+    [SerializeField, Min(minVolumeEpsilon)] private float minimumRemainingVolume = 0.2f;
     public const float minVolumeEpsilon = 1e-3f;
 
-    // 事件
+    [Header("Travel Bounds")]
+    [SerializeField] private Vector3 syringeLocalTravelAxis = Vector3.zero;
+    [SerializeField, Min(0f)] private float syringeTravelPadding = 0f;
+    [SerializeField, Min(0f)] private float syringeBottomReserve = 0f;
+    [SerializeField] private bool invertSyringeBottomDirection = false;
+
+    [Header("Drag")]
+    [SerializeField] private bool configurePistonInteractionAtRuntime = true;
+    [SerializeField] private bool addMissingPistonDragCollider = true;
+    [SerializeField] private bool enableDirectMouseDragFallback = true;
+    [SerializeField] private bool driveSimulationWhenNoVolumeListener = true;
+    [SerializeField] private float dragStartThreshold = 5f;
+    [SerializeField] private float screenDragSensitivity = 0.001f;
+    [SerializeField] private float maxStepFractionPerFrame = 0.25f;
+
+    [Header("Motion")]
+    public float smoothTime = 0.1f;
+
     public System.Action<float> OnVolumeChanged;
-    public System.Action<bool> OnVolumeRangeExceeded; // 当体积超出范围时触发
+    public System.Action<bool> OnVolumeRangeExceeded;
     public System.Action<bool> OnInteractionStateChanged;
+    public System.Action<float, float> OnVolumeLimitsChanged;
 
-    //平滑移动参数
-    private float targetPistonY;// 目标活塞位置
-    private float smoothVelocity; // 平滑移动的速度
-    public float smoothTime = 0.1f; // 平滑移动的时间常数
-
+    private bool isDragging;
+    private bool pointerDown;
+    private bool canDrag;
+    private float lastVolume;
+    private float volumeChangeRate;
+    private float lastChangeTime;
+    private float accumulatedDrag;
+    private float targetPistonAxisPosition;
+    private float smoothVelocity;
+    private float dragPointerAxisOffset;
+    private float fallbackDragStartAxisPosition;
+    private Vector2 previousDragScreenPosition;
+    private Vector2 previousDirectMousePosition;
+    private Camera dragCamera;
+    private Camera directMouseCamera;
+    private bool directMouseDragging;
     private IdealGasSimulation.ProcessType currentProcess;
+    private Transform resolvedSyringe;
+    private Transform resolvedPistonTopColumn;
+    private Vector3 initialPistonLocalPosition;
+    private Vector3 initialPistonWorldPosition;
+    private Vector3 pistonWorldMoveAxis = Vector3.up;
+    private float pistonWorldUnitsPerAxisUnit = 1f;
+    private float pistonAxisAtMaxVolume;
+    private float pistonAxisAtMinVolume;
+    private float pistonAxisAtMinimumRemainingVolume;
+    private float referenceVolume = 1.0f;
+    private bool subscribedToSimulation;
+    private bool travelSettingsSnapshotReady;
+    private float lastSyringeBottomReserve;
+    private float lastSyringeTravelPadding;
+    private float lastMinimumRemainingVolume;
+    private Vector3 lastSyringeLocalTravelAxis;
+    private bool lastInvertSyringeBottomDirection;
 
     private void Start()
     {
-        currentProcess = IdealGasSimulation.Instance.GetCurrentProcess();
-        //监听气体变化
-        IdealGasSimulation.Instance.OnStateChanged += OnGasStateChanged;
-        //初始化目标位置为当前活塞位置
-        targetPistonY = piston.localPosition.y;
+        if (piston == null)
+        {
+            Debug.LogError($"{nameof(CylinderController)} requires a piston Transform.", this);
+            enabled = false;
+            return;
+        }
 
+        SynchronizeVolumeLimitsWithSimulation();
 
+        if (IdealGasSimulation.Instance != null)
+        {
+            currentProcess = IdealGasSimulation.Instance.GetCurrentProcess();
+            IdealGasSimulation.Instance.OnStateChanged += OnGasStateChanged;
+            subscribedToSimulation = true;
+        }
 
-        // 初始设置活塞位置（对应1.0L体积）
-        SetPistonPosition(1.0f);
+        initialPistonLocalPosition = piston.localPosition;
+        initialPistonWorldPosition = piston.position;
+        resolvedSyringe = ResolveSyringeTravelSource();
+        resolvedPistonTopColumn = ResolvePistonTopColumn();
+        pistonWorldMoveAxis = ResolvePistonWorldMoveAxis(resolvedSyringe);
+        pistonWorldUnitsPerAxisUnit = ResolvePistonWorldUnitsPerAxisUnit();
+        referenceVolume = ResolveReferenceVolume();
+        ResolvePistonTravelRange();
+        StoreTravelSettingsSnapshot();
+
+        targetPistonAxisPosition = PistonAxisPositionFromVolume(GetSimulationVolumeOrReference());
+        SetPistonAxisPosition(targetPistonAxisPosition);
         lastVolume = GetCurrentVolume();
         lastChangeTime = Time.time;
-        blockedByPressure = GetPressure() >= IdealGasSimulation.Instance.GetMaxPressure();
+        SetPistonDragged(currentProcess);
+
+        if (configurePistonInteractionAtRuntime)
+        {
+            ConfigurePistonInteraction();
+        }
+
+        NotifyVolumeLimitsChanged();
     }
-    
+
+    private void OnDestroy()
+    {
+        if (subscribedToSimulation && IdealGasSimulation.Instance != null)
+        {
+            IdealGasSimulation.Instance.OnStateChanged -= OnGasStateChanged;
+        }
+    }
+
     private void Update()
     {
-        // 计算体积变化率
-        if (Time.time - lastChangeTime > 0.1f) // 每0.1秒计算一次
+        if (piston == null)
+        {
+            return;
+        }
+
+        if (Time.time - lastChangeTime > 0.1f)
         {
             float currentVolume = GetCurrentVolume();
             volumeChangeRate = Mathf.Abs(currentVolume - lastVolume) / (Time.time - lastChangeTime);
             lastVolume = currentVolume;
             lastChangeTime = Time.time;
         }
-        // 如果之前被压强阻止，检查是否可以解除阻止
-        if (blockedByPressure && GetPressure() < IdealGasSimulation.Instance.GetMaxPressure())
-        {
-            blockedByPressure = false;
-        }
+
+        HandleDirectMouseDragFallback();
+        RefreshTravelRangeIfNeeded();
         SmoothChangePiston();
     }
 
+    #region Drag
 
-    #region 鼠标拖拽
     public void OnPointerDown(PointerEventData eventData)
     {
-        // 使用 pressPosition 作为基准，清零累计值，不立即进入拖动状态
-        pointerDown = true;
-        isDragging = false;
-        accumulatedDrag = 0f;
-        OnInteractionStateChanged?.Invoke(true);
+        BeginPistonDrag(eventData.position, eventData.pressEventCamera);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        //如果为等容过程，不允许拖动
-        if (!canDrag)
-            return;
-
-        if (!pointerDown)
-            return;
-
-        // 累计绝对位移用于阈值判断（避免点按触发）
-        accumulatedDrag += Mathf.Abs(eventData.delta.y);
-
-        if (!isDragging)
-        {
-            if (accumulatedDrag < dragStartThreshold)
-            {
-                return; // 尚未达到拖动阈值
-            }
-            isDragging = true;
-            // initialPistonY 已记录为按下时的活塞位置
-        }
-
-        // 使用增量移动，避免将鼠标总位移相对于按下时一次性映射到活塞位置
-        float rawDeltaY = eventData.delta.y;
-        float pistonDeltaY = rawDeltaY * sensitivity * cylinderHeight;
-
-        // 限制单帧最大移动量，防止快速一帧内跳到边缘
-        float maxStep = cylinderHeight * maxStepFractionPerFrame;
-        pistonDeltaY = Mathf.Clamp(pistonDeltaY, -maxStep, maxStep);
-
-        // 采用相对于当前活塞位置的增量
-        float tentativePistonY = piston.localPosition.y + pistonDeltaY;
-
-        // 限制活塞位置在气缸范围内（基础范围）
-        float minPistonY = -cylinderHeight / 2;
-        float maxPistonY = cylinderHeight / 2;
-
-        // 计算当前体积和新体积
-        float currentVolume = GetCurrentVolume();
-        float newVolume = VolumeFromPistonY(tentativePistonY);
-
-        // 检查体积边界
-        if (newVolume <= minHeight)
-        {
-            tentativePistonY = PistonYFromVolume(minHeight);
-            // 触发体积超出范围事件
-            OnVolumeRangeExceeded?.Invoke(true);
-        }
-        else if (newVolume >= maxHeight)
-        {
-            tentativePistonY = PistonYFromVolume(maxHeight);
-            // 触发体积超出范围事件
-            OnVolumeRangeExceeded?.Invoke(true);
-        }
-        else
-        {
-            // 体积在有效范围内
-            OnVolumeRangeExceeded?.Invoke(false);
-        }
-
-        if (newVolume < IdealGasSimulation.Instance.GetMinVolume())
-        {
-            // 触发体积超出范围事件
-            OnVolumeRangeExceeded?.Invoke(true);
-            return;
-        }
-
-        // 改为设置目标位置（不要直接瞬移）
-        targetPistonY = tentativePistonY;
-
-        // 计算当前体积并通知
-        float appliedVolume = GetCurrentVolume();
-
-
-        OnVolumeChanged?.Invoke(appliedVolume);
+        DragPiston(eventData.position, eventData.delta, eventData.pressEventCamera);
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        EndPistonDrag();
+    }
+
+    public void BeginPistonDrag(Vector2 screenPosition, Camera eventCamera)
+    {
+        if (!canDrag)
+        {
+            return;
+        }
+
+        pointerDown = true;
+        isDragging = false;
+        accumulatedDrag = 0f;
+        dragCamera = ResolveDragCamera(eventCamera);
+        previousDragScreenPosition = screenPosition;
+        fallbackDragStartAxisPosition = targetPistonAxisPosition;
+
+        if (TryGetPointerAxisPosition(screenPosition, dragCamera, out float pointerAxisPosition))
+        {
+            dragPointerAxisOffset = targetPistonAxisPosition - pointerAxisPosition;
+        }
+        else
+        {
+            dragPointerAxisOffset = 0f;
+        }
+
+        OnInteractionStateChanged?.Invoke(true);
+    }
+
+    public void DragPiston(Vector2 screenPosition, Vector2 screenDelta, Camera eventCamera)
+    {
+        if (!canDrag || !pointerDown)
+        {
+            return;
+        }
+
+        dragCamera = ResolveDragCamera(eventCamera != null ? eventCamera : dragCamera);
+        accumulatedDrag += screenDelta.magnitude;
+        if (!isDragging)
+        {
+            if (accumulatedDrag < dragStartThreshold)
+            {
+                previousDragScreenPosition = screenPosition;
+                return;
+            }
+
+            isDragging = true;
+        }
+
+        float targetAxisPosition;
+        if (TryGetPointerAxisPosition(screenPosition, dragCamera, out float pointerAxisPosition))
+        {
+            targetAxisPosition = pointerAxisPosition + dragPointerAxisOffset;
+        }
+        else
+        {
+            Vector2 delta = screenDelta;
+            if (delta.sqrMagnitude <= Mathf.Epsilon)
+            {
+                delta = screenPosition - previousDragScreenPosition;
+            }
+
+            float screenAxisDelta = Vector2.Dot(delta, GetScreenAxisDirection(dragCamera));
+            float maxStep = Mathf.Max(cylinderHeight, 0.0001f) * maxStepFractionPerFrame;
+            float axisDelta = Mathf.Clamp(screenAxisDelta * screenDragSensitivity * cylinderHeight, -maxStep, maxStep);
+            fallbackDragStartAxisPosition = ClampPistonAxisPosition(fallbackDragStartAxisPosition + axisDelta);
+            targetAxisPosition = fallbackDragStartAxisPosition;
+        }
+
+        previousDragScreenPosition = screenPosition;
+        ApplyVolumeFromAxisPosition(targetAxisPosition, true);
+    }
+
+    public void EndPistonDrag()
+    {
+        if (!pointerDown && !isDragging)
+        {
+            return;
+        }
+
         isDragging = false;
         pointerDown = false;
         accumulatedDrag = 0f;
+        smoothVelocity = 0f;
         OnInteractionStateChanged?.Invoke(false);
+    }
+
+    private void HandleDirectMouseDragFallback()
+    {
+        if (!enableDirectMouseDragFallback || !canDrag)
+        {
+            if (directMouseDragging)
+            {
+                directMouseDragging = false;
+                EndPistonDrag();
+            }
+
+            return;
+        }
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            Vector2 mousePosition = Input.mousePosition;
+            if (!IsPointerOverBlockingUiControl(mousePosition) && TryGetPistonUnderPointer(mousePosition, out Camera hitCamera))
+            {
+                directMouseDragging = true;
+                directMouseCamera = hitCamera;
+                previousDirectMousePosition = mousePosition;
+                BeginPistonDrag(mousePosition, directMouseCamera);
+            }
+        }
+
+        if (directMouseDragging && Input.GetMouseButton(0))
+        {
+            Vector2 mousePosition = Input.mousePosition;
+            DragPiston(mousePosition, mousePosition - previousDirectMousePosition, directMouseCamera);
+            previousDirectMousePosition = mousePosition;
+        }
+
+        if (directMouseDragging && Input.GetMouseButtonUp(0))
+        {
+            directMouseDragging = false;
+            EndPistonDrag();
+        }
+    }
+
+    private void ApplyVolumeFromAxisPosition(float axisPosition, bool notifySimulation)
+    {
+        float clampedAxisPosition = ClampPistonAxisPosition(axisPosition);
+        float newVolume = VolumeFromPistonAxisPosition(clampedAxisPosition);
+        bool exceeded = Mathf.Abs(axisPosition - clampedAxisPosition) > 0.0001f;
+
+        targetPistonAxisPosition = PistonAxisPositionFromVolume(newVolume);
+        SetPistonAxisPosition(targetPistonAxisPosition);
+        smoothVelocity = 0f;
+        OnVolumeRangeExceeded?.Invoke(exceeded);
+
+        if (notifySimulation)
+        {
+            NotifyVolumeChanged(newVolume);
+        }
+    }
+
+    private void NotifyVolumeChanged(float newVolume)
+    {
+        if (OnVolumeChanged == null && driveSimulationWhenNoVolumeListener && IdealGasSimulation.Instance != null)
+        {
+            IdealGasSimulation.Instance.SetVolume(newVolume);
+            return;
+        }
+
+        OnVolumeChanged?.Invoke(newVolume);
     }
 
     #endregion
 
+    #region Piston Motion
 
-    #region 平滑移动活塞
     private void SmoothChangePiston()
     {
-        float newY = Mathf.SmoothDamp(
-            piston.localPosition.y,
-            targetPistonY,
+        if (isDragging)
+        {
+            return;
+        }
+
+        if (smoothTime <= 0f)
+        {
+            SetPistonAxisPosition(targetPistonAxisPosition);
+            return;
+        }
+
+        float newAxisPosition = Mathf.SmoothDamp(
+            GetCurrentPistonAxisPosition(),
+            targetPistonAxisPosition,
             ref smoothVelocity,
             smoothTime
         );
 
-        piston.localPosition = new Vector3(
-            piston.localPosition.x,
-            newY,
-            piston.localPosition.z
-        );
+        SetPistonAxisPosition(newAxisPosition);
     }
-    #endregion
 
     private void OnGasStateChanged(float pressure, float volume, float temperature)
     {
-        // 正在拖拽时，不要覆盖玩家操作
-        if (isDragging) return;
+        if (isDragging)
+        {
+            return;
+        }
 
-        // 限制体积在有效范围内
-        float clampedVolume = Mathf.Clamp(volume, minHeight, maxHeight);
-        
-        // 根据体积计算目标位置
-        targetPistonY = PistonYFromVolume(clampedVolume);
-    } 
+        float clampedVolume = ClampRuntimeVolume(volume);
+        targetPistonAxisPosition = PistonAxisPositionFromVolume(clampedVolume);
+        OnVolumeRangeExceeded?.Invoke(!Mathf.Approximately(clampedVolume, volume));
 
+        if (!Mathf.Approximately(clampedVolume, volume) && CanDriveSimulationVolume())
+        {
+            IdealGasSimulation.Instance.SetVolume(clampedVolume);
+        }
+    }
+
+    public void SetPistonPosition(float volume)
+    {
+        float clampedVolume = ClampRuntimeVolume(volume);
+        targetPistonAxisPosition = PistonAxisPositionFromVolume(clampedVolume);
+        SetPistonAxisPosition(targetPistonAxisPosition);
+        smoothVelocity = 0f;
+    }
+
+    #endregion
+
+    #region Volume Mapping
 
     private float GetCurrentVolume()
     {
-        // 将活塞的Y位置归一化为[0, 1]范围
-        float normalizedPosition = Mathf.InverseLerp(-cylinderHeight / 2, cylinderHeight / 2, piston.localPosition.y);
-
-        // 将归一化的活塞位置映射到体积范围[minHeight, maxHeight]
-        float volume = Mathf.Lerp(maxHeight, minHeight, normalizedPosition);
-
-        return Mathf.Clamp(volume, minHeight + minVolumeEpsilon, maxHeight); // 保证体积在有效范围内，避免为0
+        return VolumeFromPistonAxisPosition(GetCurrentPistonAxisPosition());
     }
 
-
-    // 根据指定的活塞Y位置计算体积（不修改实际位置）
-    private float VolumeFromPistonY(float pistonY)
+    private float VolumeFromPistonAxisPosition(float pistonAxisPosition)
     {
-        float normalizedPosition = Mathf.InverseLerp(-cylinderHeight / 2, cylinderHeight / 2, pistonY);
-        float volume = Mathf.Lerp(maxHeight, minHeight, normalizedPosition);
-        return Mathf.Clamp(volume, minHeight + minVolumeEpsilon, maxHeight);
+        pistonAxisPosition = ClampPistonAxisPosition(pistonAxisPosition);
+        float normalizedPosition = Mathf.InverseLerp(pistonAxisAtMaxVolume, pistonAxisAtMinVolume, pistonAxisPosition);
+        float volume = Mathf.Lerp(GetMaximumRuntimeVolume(), GetMinimumRuntimeVolume(), normalizedPosition);
+        return ClampRuntimeVolume(volume);
     }
 
-    // 根据给定体积返回对应的活塞Y位置（不修改实际位置）
-    private float PistonYFromVolume(float volume)
+    private float PistonAxisPositionFromVolume(float volume)
     {
-        float normalizedVolume = Mathf.InverseLerp(minHeight, maxHeight, volume);
-        float pistonY = Mathf.Lerp(cylinderHeight / 2, -cylinderHeight / 2, normalizedVolume);
-        return pistonY;
+        float clampedVolume = ClampRuntimeVolume(volume);
+        float normalizedVolume = Mathf.InverseLerp(GetPhysicalMinimumVolume(), GetMaximumRuntimeVolume(), clampedVolume);
+        float pistonAxisPosition = Mathf.Lerp(pistonAxisAtMinVolume, pistonAxisAtMaxVolume, normalizedVolume);
+        return ClampPistonAxisPosition(pistonAxisPosition);
     }
 
-    private float GetPressure()
+    private float ClampRuntimeVolume(float volume)
     {
-        float volume = GetCurrentVolume();
-        // 防止除以0
-        float safeVolume = Mathf.Max(volume, minVolumeEpsilon);
-        float pressure = (IdealGasSimulation.Instance.moles * IdealGasSimulation.R * IdealGasSimulation.Instance.GetTemperature()) / safeVolume;
-        return Mathf.Clamp(pressure, IdealGasSimulation.Instance.GetMinPressure(), IdealGasSimulation.Instance.GetMaxPressure()); // 保证压强在合理范围内
+        return Mathf.Clamp(volume, GetMinimumRuntimeVolume(), GetMaximumRuntimeVolume());
     }
 
-    // 设置活塞位置（对应体积），会平滑移动到该位置
-    public void SetPistonPosition(float volume)
+    private float GetMinimumRuntimeVolume()
     {
-        // 将体积映射到[0, 1]范围
-        float normalizedVolume = Mathf.InverseLerp(minHeight, maxHeight, volume);
-
-        // 将归一化的体积值映射到活塞的Y位置
-        float pistonY = Mathf.Lerp(cylinderHeight / 2, -cylinderHeight / 2, normalizedVolume);
-
-
-        targetPistonY=pistonY; // 设置目标位置，平滑移动到该位置
-        // 设置活塞位置
-        piston.localPosition = new Vector3(piston.localPosition.x, pistonY, piston.localPosition.z);
+        return Mathf.Clamp(
+            Mathf.Max(GetPhysicalMinimumVolume(), minimumRemainingVolume, minVolumeEpsilon),
+            GetPhysicalMinimumVolume(),
+            GetMaximumRuntimeVolume()
+        );
     }
-    
+
+    private float GetPhysicalMinimumVolume()
+    {
+        return Mathf.Max(minHeight, minVolumeEpsilon);
+    }
+
+    private float GetMaximumRuntimeVolume()
+    {
+        return Mathf.Max(maxHeight, GetPhysicalMinimumVolume() + minVolumeEpsilon);
+    }
+
+    private float GetSimulationVolumeOrReference()
+    {
+        if (IdealGasSimulation.Instance == null)
+        {
+            return referenceVolume;
+        }
+
+        return IdealGasSimulation.Instance.GetVolume();
+    }
+
+    private void SynchronizeVolumeLimitsWithSimulation()
+    {
+        if (IdealGasSimulation.Instance == null)
+        {
+            minHeight = Mathf.Max(minHeight, minVolumeEpsilon);
+            maxHeight = Mathf.Max(maxHeight, minHeight + minVolumeEpsilon);
+            SanitizeVolumeLimits();
+            return;
+        }
+
+        minHeight = Mathf.Max(IdealGasSimulation.Instance.GetMinVolume(), minVolumeEpsilon);
+        maxHeight = Mathf.Max(IdealGasSimulation.Instance.GetMaxVolume(), minHeight + minVolumeEpsilon);
+        SanitizeVolumeLimits();
+    }
+
+    private void SanitizeVolumeLimits()
+    {
+        minHeight = Mathf.Max(minHeight, minVolumeEpsilon);
+        maxHeight = Mathf.Max(maxHeight, minHeight + minVolumeEpsilon);
+        minimumRemainingVolume = Mathf.Clamp(minimumRemainingVolume, minHeight, maxHeight);
+    }
+
+    #endregion
+
+    #region Travel Resolution
+
+    private Vector3 GetPistonWorldMoveAxis()
+    {
+        if (pistonWorldMoveAxis.sqrMagnitude <= Mathf.Epsilon)
+        {
+            return Vector3.up;
+        }
+
+        return pistonWorldMoveAxis.normalized;
+    }
+
+    private float ResolvePistonWorldUnitsPerAxisUnit()
+    {
+        if (piston.parent == null)
+        {
+            return 1f;
+        }
+
+        float scale = piston.parent.TransformVector(Vector3.up).magnitude;
+        return Mathf.Max(scale, 0.0001f);
+    }
+
+    private float GetCurrentPistonAxisPosition()
+    {
+        float worldOffset = Vector3.Dot(piston.position - initialPistonWorldPosition, GetPistonWorldMoveAxis());
+        return initialPistonLocalPosition.y + worldOffset / pistonWorldUnitsPerAxisUnit;
+    }
+
+    private void SetPistonAxisPosition(float axisPosition)
+    {
+        axisPosition = ClampPistonAxisPosition(axisPosition);
+        float axisOffset = axisPosition - initialPistonLocalPosition.y;
+        piston.position = initialPistonWorldPosition + GetPistonWorldMoveAxis() * axisOffset * pistonWorldUnitsPerAxisUnit;
+    }
+
+    private float ClampPistonAxisPosition(float axisPosition)
+    {
+        float minAxis = Mathf.Min(pistonAxisAtMaxVolume, pistonAxisAtMinimumRemainingVolume);
+        float maxAxis = Mathf.Max(pistonAxisAtMaxVolume, pistonAxisAtMinimumRemainingVolume);
+        return Mathf.Clamp(axisPosition, minAxis, maxAxis);
+    }
+
+    private float ResolveReferenceVolume()
+    {
+        float initialVolume = GetSimulationVolumeOrReference();
+        if (initialVolume <= 0f)
+        {
+            initialVolume = referenceVolume;
+        }
+
+        return ClampRuntimeVolume(initialVolume);
+    }
+
+    private float GetReferenceMappedAxisPosition()
+    {
+        float normalizedReferenceVolume = Mathf.InverseLerp(GetPhysicalMinimumVolume(), GetMaximumRuntimeVolume(), referenceVolume);
+        return Mathf.Lerp(cylinderHeight / 2f, -cylinderHeight / 2f, normalizedReferenceVolume);
+    }
+
+    private void ResolvePistonTravelRange()
+    {
+        Transform travelSource = resolvedSyringe != null ? resolvedSyringe : ResolveSyringeTravelSource();
+        if (TryGetTravelProjectionRange(travelSource, GetPistonWorldMoveAxis(), out float minProjection, out float maxProjection))
+        {
+            float padding = Mathf.Max(0f, syringeTravelPadding);
+            if (maxProjection - minProjection > padding * 2f)
+            {
+                minProjection += padding;
+                maxProjection -= padding;
+            }
+
+            if (TryGetPistonTopColumnProjectionOffsets(GetPistonWorldMoveAxis(), out float minColumnOffset, out float maxColumnOffset))
+            {
+                minProjection -= minColumnOffset;
+                maxProjection -= maxColumnOffset;
+            }
+
+            if (maxProjection < minProjection)
+            {
+                float collapsedProjection = (minProjection + maxProjection) * 0.5f;
+                minProjection = collapsedProjection;
+                maxProjection = collapsedProjection;
+            }
+
+            float minAxisPosition = AxisPositionFromWorldProjection(minProjection);
+            float maxAxisPosition = AxisPositionFromWorldProjection(maxProjection);
+            ResolveVolumeAxisEndpoints(Mathf.Min(minAxisPosition, maxAxisPosition), Mathf.Max(minAxisPosition, maxAxisPosition));
+            cylinderHeight = Mathf.Max(Mathf.Abs(pistonAxisAtMinVolume - pistonAxisAtMaxVolume), 0.0001f);
+            return;
+        }
+
+        float referenceMappedAxisPosition = GetReferenceMappedAxisPosition();
+        float fallbackMinAxis = initialPistonLocalPosition.y - cylinderHeight / 2f - referenceMappedAxisPosition;
+        float fallbackMaxAxis = initialPistonLocalPosition.y + cylinderHeight / 2f - referenceMappedAxisPosition;
+        ResolveVolumeAxisEndpoints(fallbackMinAxis, fallbackMaxAxis);
+    }
+
+    private void ResolveVolumeAxisEndpoints(float travelMinAxis, float travelMaxAxis)
+    {
+        float reserveAxisDistance = Mathf.Max(0f, syringeBottomReserve) / Mathf.Max(pistonWorldUnitsPerAxisUnit, 0.0001f);
+        float directionToBottom = ResolveBottomDirectionSign();
+        float travelSpan = Mathf.Max(travelMaxAxis - travelMinAxis, 0.0001f);
+        reserveAxisDistance = Mathf.Min(reserveAxisDistance, travelSpan - 0.0001f);
+
+        if (directionToBottom > 0f)
+        {
+            pistonAxisAtMinVolume = travelMaxAxis - reserveAxisDistance;
+            pistonAxisAtMaxVolume = travelMinAxis;
+        }
+        else
+        {
+            pistonAxisAtMinVolume = travelMinAxis + reserveAxisDistance;
+            pistonAxisAtMaxVolume = travelMaxAxis;
+        }
+
+        cylinderHeight = Mathf.Max(Mathf.Abs(pistonAxisAtMaxVolume - pistonAxisAtMinVolume), 0.0001f);
+        UpdateMinimumRemainingAxisPosition();
+    }
+
+    private void UpdateMinimumRemainingAxisPosition()
+    {
+        float normalizedVolume = Mathf.InverseLerp(
+            GetPhysicalMinimumVolume(),
+            GetMaximumRuntimeVolume(),
+            ClampRuntimeVolume(GetMinimumRuntimeVolume())
+        );
+
+        pistonAxisAtMinimumRemainingVolume = Mathf.Lerp(
+            pistonAxisAtMinVolume,
+            pistonAxisAtMaxVolume,
+            normalizedVolume
+        );
+    }
+
+    private void RefreshTravelRangeIfNeeded()
+    {
+        if (!travelSettingsSnapshotReady || piston == null)
+        {
+            return;
+        }
+
+        bool settingsChanged =
+            !Mathf.Approximately(lastSyringeBottomReserve, syringeBottomReserve) ||
+            !Mathf.Approximately(lastSyringeTravelPadding, syringeTravelPadding) ||
+            !Mathf.Approximately(lastMinimumRemainingVolume, minimumRemainingVolume) ||
+            lastSyringeLocalTravelAxis != syringeLocalTravelAxis ||
+            lastInvertSyringeBottomDirection != invertSyringeBottomDirection;
+
+        if (!settingsChanged)
+        {
+            return;
+        }
+
+        float preservedVolume = IdealGasSimulation.Instance != null
+            ? IdealGasSimulation.Instance.GetVolume()
+            : GetCurrentVolume();
+
+        SanitizeVolumeLimits();
+        ResolvePistonTravelRange();
+        StoreTravelSettingsSnapshot();
+        NotifyVolumeLimitsChanged();
+
+        float clampedPreservedVolume = ClampRuntimeVolume(preservedVolume);
+        targetPistonAxisPosition = PistonAxisPositionFromVolume(clampedPreservedVolume);
+        if (!Mathf.Approximately(clampedPreservedVolume, preservedVolume) && CanDriveSimulationVolume())
+        {
+            IdealGasSimulation.Instance.SetVolume(clampedPreservedVolume);
+        }
+
+        if (isDragging)
+        {
+            SetPistonAxisPosition(targetPistonAxisPosition);
+            smoothVelocity = 0f;
+        }
+    }
+
+    private void StoreTravelSettingsSnapshot()
+    {
+        lastSyringeBottomReserve = syringeBottomReserve;
+        lastSyringeTravelPadding = syringeTravelPadding;
+        lastMinimumRemainingVolume = minimumRemainingVolume;
+        lastSyringeLocalTravelAxis = syringeLocalTravelAxis;
+        lastInvertSyringeBottomDirection = invertSyringeBottomDirection;
+        travelSettingsSnapshotReady = true;
+    }
+
+    private bool CanDriveSimulationVolume()
+    {
+        return IdealGasSimulation.Instance != null
+            && IdealGasSimulation.Instance.GetCurrentProcess() != IdealGasSimulation.ProcessType.Isochoric;
+    }
+
+    public float GetMinimumAllowedVolume()
+    {
+        return GetMinimumRuntimeVolume();
+    }
+
+    public float GetMaximumAllowedVolume()
+    {
+        return GetMaximumRuntimeVolume();
+    }
+
+    private void NotifyVolumeLimitsChanged()
+    {
+        OnVolumeLimitsChanged?.Invoke(GetMinimumRuntimeVolume(), GetMaximumRuntimeVolume());
+    }
+
+    private float ResolveBottomDirectionSign()
+    {
+        Vector3 axis = GetPistonWorldMoveAxis();
+        float direction = 1f;
+
+        if (TryGetPistonTopColumnProjectionOffsets(axis, out float minColumnOffset, out float maxColumnOffset))
+        {
+            float farColumnOffset = Mathf.Abs(maxColumnOffset) >= Mathf.Abs(minColumnOffset)
+                ? maxColumnOffset
+                : minColumnOffset;
+
+            if (Mathf.Abs(farColumnOffset) > 0.0001f)
+            {
+                direction = Mathf.Sign(farColumnOffset);
+            }
+        }
+        else if (piston != null && piston.parent != null)
+        {
+            float localYDirection = Vector3.Dot(piston.parent.TransformVector(Vector3.up), axis);
+            if (Mathf.Abs(localYDirection) > 0.0001f)
+            {
+                direction = Mathf.Sign(localYDirection);
+            }
+        }
+
+        return invertSyringeBottomDirection ? -direction : direction;
+    }
+
+    private Transform ResolveSyringeTravelSource()
+    {
+        if (syringe != null)
+        {
+            return syringe;
+        }
+
+        if (transform.name.Equals("syringe", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return transform;
+        }
+
+        Transform syringeChild = FindChildByName(transform, "syringe");
+        if (syringeChild != null)
+        {
+            return syringeChild;
+        }
+
+        Transform rootSyringe = FindChildByName(transform.root, "syringe");
+        return rootSyringe != null ? rootSyringe : transform;
+    }
+
+    private Transform ResolvePistonTopColumn()
+    {
+        if (pistonTopColumn != null)
+        {
+            return pistonTopColumn;
+        }
+
+        if (piston == null)
+        {
+            return null;
+        }
+
+        Transform column = FindChildByName(piston, "column");
+        return column != null ? column : piston;
+    }
+
+    private Transform FindChildByName(Transform parent, string childName)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name.Equals(childName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+
+            Transform match = FindChildByName(child, childName);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryGetPistonTopColumnProjectionOffsets(Vector3 axis, out float minOffset, out float maxOffset)
+    {
+        minOffset = float.PositiveInfinity;
+        maxOffset = float.NegativeInfinity;
+
+        if (resolvedPistonTopColumn == null || axis.sqrMagnitude <= Mathf.Epsilon)
+        {
+            return false;
+        }
+
+        axis.Normalize();
+        bool hasBounds = false;
+        Renderer[] renderers = resolvedPistonTopColumn.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in renderers)
+        {
+            EncapsulateProjectedOffsetBounds(renderer.bounds, axis, ref minOffset, ref maxOffset);
+            hasBounds = true;
+        }
+
+        if (hasBounds)
+        {
+            return maxOffset >= minOffset;
+        }
+
+        Collider[] colliders = resolvedPistonTopColumn.GetComponentsInChildren<Collider>(true);
+        foreach (Collider collider in colliders)
+        {
+            EncapsulateProjectedOffsetBounds(collider.bounds, axis, ref minOffset, ref maxOffset);
+            hasBounds = true;
+        }
+
+        if (hasBounds)
+        {
+            return maxOffset >= minOffset;
+        }
+
+        float pointOffset = Vector3.Dot(resolvedPistonTopColumn.position - initialPistonWorldPosition, axis);
+        minOffset = pointOffset;
+        maxOffset = pointOffset;
+        return true;
+    }
+
+    private Vector3 ResolvePistonWorldMoveAxis(Transform travelSource)
+    {
+        if (travelSource != null && syringeLocalTravelAxis.sqrMagnitude > Mathf.Epsilon)
+        {
+            return travelSource.TransformDirection(syringeLocalTravelAxis).normalized;
+        }
+
+        if (travelSource == null)
+        {
+            return Vector3.up;
+        }
+
+        Vector3[] candidateAxes =
+        {
+            travelSource.right,
+            travelSource.up,
+            travelSource.forward
+        };
+
+        Vector3 bestAxis = candidateAxes[0].normalized;
+        float bestLength = -1f;
+        foreach (Vector3 candidateAxis in candidateAxes)
+        {
+            Vector3 axis = candidateAxis.normalized;
+            if (TryGetTravelProjectionRange(travelSource, axis, out float minProjection, out float maxProjection))
+            {
+                float length = maxProjection - minProjection;
+                if (length > bestLength)
+                {
+                    bestLength = length;
+                    bestAxis = axis;
+                }
+            }
+        }
+
+        return bestAxis.sqrMagnitude > Mathf.Epsilon ? bestAxis.normalized : Vector3.up;
+    }
+
+    private bool TryGetTravelProjectionRange(Transform source, Vector3 axis, out float minProjection, out float maxProjection)
+    {
+        minProjection = float.PositiveInfinity;
+        maxProjection = float.NegativeInfinity;
+
+        if (source == null || axis.sqrMagnitude <= Mathf.Epsilon)
+        {
+            return false;
+        }
+
+        axis.Normalize();
+        bool hasBounds = false;
+        Renderer[] renderers = source.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in renderers)
+        {
+            if (ShouldIgnoreTravelBounds(renderer.transform))
+            {
+                continue;
+            }
+
+            EncapsulateProjectedBounds(renderer.bounds, axis, ref minProjection, ref maxProjection);
+            hasBounds = true;
+        }
+
+        if (hasBounds)
+        {
+            return maxProjection > minProjection;
+        }
+
+        Collider[] colliders = source.GetComponentsInChildren<Collider>(true);
+        foreach (Collider collider in colliders)
+        {
+            if (ShouldIgnoreTravelBounds(collider.transform))
+            {
+                continue;
+            }
+
+            EncapsulateProjectedBounds(collider.bounds, axis, ref minProjection, ref maxProjection);
+            hasBounds = true;
+        }
+
+        return hasBounds && maxProjection > minProjection;
+    }
+
+    private bool ShouldIgnoreTravelBounds(Transform candidate)
+    {
+        return candidate == null || (piston != null && (candidate == piston || candidate.IsChildOf(piston)));
+    }
+
+    private void EncapsulateProjectedBounds(Bounds bounds, Vector3 axis, ref float minProjection, ref float maxProjection)
+    {
+        Vector3 center = bounds.center;
+        Vector3 extents = bounds.extents;
+
+        for (int x = -1; x <= 1; x += 2)
+        {
+            for (int y = -1; y <= 1; y += 2)
+            {
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    Vector3 corner = center + Vector3.Scale(extents, new Vector3(x, y, z));
+                    float projection = Vector3.Dot(corner, axis);
+                    minProjection = Mathf.Min(minProjection, projection);
+                    maxProjection = Mathf.Max(maxProjection, projection);
+                }
+            }
+        }
+    }
+
+    private void EncapsulateProjectedOffsetBounds(Bounds bounds, Vector3 axis, ref float minOffset, ref float maxOffset)
+    {
+        float pistonInitialProjection = Vector3.Dot(initialPistonWorldPosition, axis);
+        float minProjection = float.PositiveInfinity;
+        float maxProjection = float.NegativeInfinity;
+
+        EncapsulateProjectedBounds(bounds, axis, ref minProjection, ref maxProjection);
+
+        minOffset = Mathf.Min(minOffset, minProjection - pistonInitialProjection);
+        maxOffset = Mathf.Max(maxOffset, maxProjection - pistonInitialProjection);
+    }
+
+    private float AxisPositionFromWorldProjection(float projection)
+    {
+        float initialProjection = Vector3.Dot(initialPistonWorldPosition, GetPistonWorldMoveAxis());
+        return initialPistonLocalPosition.y + (projection - initialProjection) / pistonWorldUnitsPerAxisUnit;
+    }
+
+    #endregion
+
+    #region Pointer Projection
+
+    private Camera ResolveDragCamera(Camera eventCamera)
+    {
+        if (eventCamera != null)
+        {
+            return eventCamera;
+        }
+
+        return Camera.main;
+    }
+
+    private bool TryGetPointerAxisPosition(Vector2 screenPosition, Camera eventCamera, out float axisPosition)
+    {
+        axisPosition = targetPistonAxisPosition;
+        if (eventCamera == null)
+        {
+            return false;
+        }
+
+        Ray ray = eventCamera.ScreenPointToRay(screenPosition);
+        Vector3 axis = GetPistonWorldMoveAxis();
+        Vector3 rayDirection = ray.direction.normalized;
+        float denominator = 1f - Vector3.Dot(axis, rayDirection) * Vector3.Dot(axis, rayDirection);
+
+        if (Mathf.Abs(denominator) < 0.0001f)
+        {
+            return false;
+        }
+
+        Vector3 lineOffset = initialPistonWorldPosition - ray.origin;
+        float axisProjection = Vector3.Dot(axis, lineOffset);
+        float rayProjection = Vector3.Dot(rayDirection, lineOffset);
+        float closestAxisDistance = (Vector3.Dot(axis, rayDirection) * rayProjection - axisProjection) / denominator;
+        axisPosition = initialPistonLocalPosition.y + closestAxisDistance / pistonWorldUnitsPerAxisUnit;
+        return true;
+    }
+
+    private Vector2 GetScreenAxisDirection(Camera eventCamera)
+    {
+        if (eventCamera == null)
+        {
+            return Vector2.up;
+        }
+
+        Vector3 axis = GetPistonWorldMoveAxis();
+        Vector3 screenA = eventCamera.WorldToScreenPoint(initialPistonWorldPosition);
+        Vector3 screenB = eventCamera.WorldToScreenPoint(initialPistonWorldPosition + axis);
+        Vector2 direction = (Vector2)(screenB - screenA);
+        return direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.up;
+    }
+
+    #endregion
+
+    #region Direct Mouse Hit Testing
+
+    private bool TryGetPistonUnderPointer(Vector2 screenPosition, out Camera hitCamera)
+    {
+        hitCamera = null;
+        Camera[] cameras = Camera.allCameras;
+        if (cameras == null || cameras.Length == 0)
+        {
+            Camera mainCamera = Camera.main;
+            if (mainCamera == null)
+            {
+                return false;
+            }
+
+            cameras = new[] { mainCamera };
+        }
+
+        foreach (Camera camera in cameras)
+        {
+            if (camera == null || !camera.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            Ray ray = camera.ScreenPointToRay(screenPosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, Mathf.Infinity, camera.eventMask, QueryTriggerInteraction.Collide);
+            if (hits.Length == 0)
+            {
+                continue;
+            }
+
+            System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider != null && IsPistonTransform(hit.collider.transform))
+                {
+                    hitCamera = camera;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsPistonTransform(Transform candidate)
+    {
+        return candidate != null && piston != null && (candidate == piston || candidate.IsChildOf(piston));
+    }
+
+    private bool IsPointerOverBlockingUiControl(Vector2 screenPosition)
+    {
+        if (EventSystem.current == null)
+        {
+            return false;
+        }
+
+        PointerEventData pointerData = new PointerEventData(EventSystem.current)
+        {
+            position = screenPosition
+        };
+
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(pointerData, results);
+        foreach (RaycastResult result in results)
+        {
+            GameObject hitObject = result.gameObject;
+            if (hitObject == null)
+            {
+                continue;
+            }
+
+            if (hitObject.GetComponentInParent<Selectable>() != null)
+            {
+                return true;
+            }
+
+            if (hitObject.GetComponentInParent<Scrollbar>() != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    #endregion
+
+    #region Interaction Components
+
+    private void ConfigurePistonInteraction()
+    {
+        if (addMissingPistonDragCollider && piston.GetComponent<Collider>() == null)
+        {
+            BoxCollider boxCollider = piston.gameObject.AddComponent<BoxCollider>();
+            boxCollider.isTrigger = false;
+            ApplyRendererBoundsToBoxCollider(boxCollider);
+        }
+
+        Collider[] colliders = piston.GetComponentsInChildren<Collider>(true);
+        if (colliders.Length == 0)
+        {
+            BoxCollider boxCollider = piston.gameObject.AddComponent<BoxCollider>();
+            boxCollider.isTrigger = false;
+            ApplyRendererBoundsToBoxCollider(boxCollider);
+            colliders = piston.GetComponentsInChildren<Collider>(true);
+        }
+
+        AttachDragReceiver(piston.gameObject);
+        foreach (Collider collider in colliders)
+        {
+            AttachDragReceiver(collider.gameObject);
+        }
+
+        Camera[] cameras = FindObjectsOfType<Camera>();
+        foreach (Camera camera in cameras)
+        {
+            if (camera.GetComponent<PhysicsRaycaster>() == null)
+            {
+                camera.gameObject.AddComponent<PhysicsRaycaster>();
+            }
+        }
+    }
+
+    private void AttachDragReceiver(GameObject target)
+    {
+        if (target == null || target == gameObject)
+        {
+            return;
+        }
+
+        CylinderPistonDragReceiver receiver = target.GetComponent<CylinderPistonDragReceiver>();
+        if (receiver == null)
+        {
+            receiver = target.AddComponent<CylinderPistonDragReceiver>();
+        }
+
+        receiver.Initialize(this);
+    }
+
+    private void ApplyRendererBoundsToBoxCollider(BoxCollider boxCollider)
+    {
+        Renderer[] renderers = piston.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            boxCollider.center = Vector3.zero;
+            boxCollider.size = Vector3.one * 0.2f;
+            return;
+        }
+
+        Bounds localBounds = new Bounds(piston.InverseTransformPoint(renderers[0].bounds.center), Vector3.zero);
+        foreach (Renderer renderer in renderers)
+        {
+            EncapsulateWorldBoundsAsLocalBounds(renderer.bounds, ref localBounds);
+        }
+
+        boxCollider.center = localBounds.center;
+        boxCollider.size = Vector3.Max(localBounds.size, Vector3.one * 0.01f);
+    }
+
+    private void EncapsulateWorldBoundsAsLocalBounds(Bounds worldBounds, ref Bounds localBounds)
+    {
+        Vector3 center = worldBounds.center;
+        Vector3 extents = worldBounds.extents;
+
+        for (int x = -1; x <= 1; x += 2)
+        {
+            for (int y = -1; y <= 1; y += 2)
+            {
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    Vector3 worldCorner = center + Vector3.Scale(extents, new Vector3(x, y, z));
+                    localBounds.Encapsulate(piston.InverseTransformPoint(worldCorner));
+                }
+            }
+        }
+    }
+
+    #endregion
+
     public void SetCurrentProcess(IdealGasSimulation.ProcessType process)
     {
         currentProcess = process;
-        SetPistonDragged(process); 
-
+        SetPistonDragged(process);
     }
 
     private void SetPistonDragged(IdealGasSimulation.ProcessType process)
     {
-        canDrag= process switch
+        canDrag = process switch
         {
-            IdealGasSimulation.ProcessType.Isothermal => true, // 等温过程允许拖动
-            IdealGasSimulation.ProcessType.Isobaric => true, // 等压过程允许拖动
-            IdealGasSimulation.ProcessType.Isochoric => false, // 等容过程不允许拖动
-            IdealGasSimulation.ProcessType.Null => false, // 未选择状态不允许拖动
+            IdealGasSimulation.ProcessType.Isothermal => true,
+            IdealGasSimulation.ProcessType.Isobaric => true,
+            IdealGasSimulation.ProcessType.Isochoric => false,
+            IdealGasSimulation.ProcessType.Null => true,
             _ => false
         };
 
+        if (!canDrag)
+        {
+            EndPistonDrag();
+        }
     }
 
-    
-    // 检查体积是否稳定
     public bool IsVolumeStable()
     {
-        return volumeChangeRate < 0.01f; // 变化小于0.01L/秒视为稳定
+        return volumeChangeRate < 0.01f;
     }
-    
+
     public float GetVolumeChangeRate()
     {
-        return volumeChangeRate; 
+        return volumeChangeRate;
     }
 
     public bool GetPistonDragged()
     {
         return canDrag;
     }
+}
 
+public class CylinderPistonDragReceiver : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
+{
+    private CylinderController controller;
+
+    public void Initialize(CylinderController cylinderController)
+    {
+        controller = cylinderController;
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        controller?.BeginPistonDrag(eventData.position, eventData.pressEventCamera);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        controller?.DragPiston(eventData.position, eventData.delta, eventData.pressEventCamera);
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        controller?.EndPistonDrag();
+    }
+
+    private void OnDisable()
+    {
+        controller?.EndPistonDrag();
+    }
 }

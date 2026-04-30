@@ -31,7 +31,7 @@ public class DataCollector : MonoBehaviour
 
     private const float autoCollectInterval = 0.75f;
     private float autoCollectTimer = 0f;
-    private int requiredPointsForLines = 8;
+    private int requiredPointsForLines = 12;
     private const float marginalSettleWindow = 0.35f;
     private const float marginalVolumeRateThreshold = 0.004f;
     private const float postInteractionSettleTime = 0.4f;

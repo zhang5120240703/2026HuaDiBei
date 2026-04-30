@@ -49,10 +49,10 @@ public class UIPanel : MonoBehaviour
         
         //添加体积范围超出事件监听
         cylinderController.OnVolumeRangeExceeded += OnVolumeRangeExceeded;
+        cylinderController.OnVolumeLimitsChanged += OnVolumeLimitsChanged;
         
         //设置滑动条范围
-        volumeSlider.minValue = IdealGasSimulation.Instance.GetMinVolume();
-        volumeSlider.maxValue = IdealGasSimulation.Instance.GetMaxVolume();
+        SyncVolumeSliderRange();
         temperatureSlider.minValue = IdealGasSimulation.Instance.GetMinTemperature();
         temperatureSlider.maxValue = IdealGasSimulation.Instance.GetMaxTemperature();
         
@@ -71,12 +71,45 @@ public class UIPanel : MonoBehaviour
         SetTemperatureSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
         SetVolumeSliderDisplay(IdealGasSimulation.Instance.GetCurrentProcess());
     }
+
+    private void OnDestroy()
+    {
+        if (cylinderController != null)
+        {
+            cylinderController.OnVolumeRangeExceeded -= OnVolumeRangeExceeded;
+            cylinderController.OnVolumeLimitsChanged -= OnVolumeLimitsChanged;
+        }
+    }
     
     // 处理体积范围超出事件
     private void OnVolumeRangeExceeded(bool isExceeded)
     {
         // 当体积超出范围时，更新滑动条的值，确保它与当前体积一致
-        volumeSlider.SetValueWithoutNotify(IdealGasSimulation.Instance.GetVolume());
+        SyncVolumeSliderRange();
+        volumeSlider.SetValueWithoutNotify(Mathf.Clamp(IdealGasSimulation.Instance.GetVolume(), volumeSlider.minValue, volumeSlider.maxValue));
+    }
+
+    private void OnVolumeLimitsChanged(float minVolume, float maxVolume)
+    {
+        SyncVolumeSliderRange(minVolume, maxVolume);
+    }
+
+    private void SyncVolumeSliderRange()
+    {
+        if (cylinderController != null)
+        {
+            SyncVolumeSliderRange(cylinderController.GetMinimumAllowedVolume(), cylinderController.GetMaximumAllowedVolume());
+            return;
+        }
+
+        SyncVolumeSliderRange(IdealGasSimulation.Instance.GetMinVolume(), IdealGasSimulation.Instance.GetMaxVolume());
+    }
+
+    private void SyncVolumeSliderRange(float minVolume, float maxVolume)
+    {
+        volumeSlider.minValue = minVolume;
+        volumeSlider.maxValue = Mathf.Max(maxVolume, minVolume);
+        volumeSlider.SetValueWithoutNotify(Mathf.Clamp(volumeSlider.value, volumeSlider.minValue, volumeSlider.maxValue));
     }
 
 
@@ -93,7 +126,8 @@ public class UIPanel : MonoBehaviour
         //使用 SetValueWithoutNotify 避免触发 onValueChanged 回调
         // 这样不会在同步 UI 时意外修改模拟状态
         temperatureSlider.SetValueWithoutNotify(temperature);
-        volumeSlider.SetValueWithoutNotify(volume);
+        SyncVolumeSliderRange();
+        volumeSlider.SetValueWithoutNotify(Mathf.Clamp(volume, volumeSlider.minValue, volumeSlider.maxValue));
     }
 
     #region Slider改变时调用
@@ -110,7 +144,14 @@ public class UIPanel : MonoBehaviour
     {
 
         // 使用Slider值来设置体积
-        IdealGasSimulation.Instance.SetVolume(value);
+        SyncVolumeSliderRange();
+        float clampedValue = Mathf.Clamp(value, volumeSlider.minValue, volumeSlider.maxValue);
+        if (!Mathf.Approximately(clampedValue, value))
+        {
+            volumeSlider.SetValueWithoutNotify(clampedValue);
+        }
+
+        IdealGasSimulation.Instance.SetVolume(clampedValue);
 
     }
     #endregion
