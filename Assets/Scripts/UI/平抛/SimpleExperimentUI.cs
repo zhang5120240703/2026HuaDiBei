@@ -50,6 +50,7 @@ public class SimpleExperimentUI : MonoBehaviour
             Debug.LogError("未找到 ProjectileExperimentController！");
             return;
         }
+        ExperimentStateManager.Instance?.ResetExperiment();
 
         BindButtons();
         BindControllerEvents();
@@ -100,7 +101,17 @@ public class SimpleExperimentUI : MonoBehaviour
         btnResume.onClick.AddListener(() => _ctrl?.RequestResume());
         btnReset.onClick.AddListener(() => _ctrl?.RequestReset());
 
-        btnConfirmStep1.onClick.AddListener(() => _ctrl?.ConfirmPrepare());
+        btnConfirmStep1.onClick.AddListener(() =>
+        {
+            _ctrl?.RequestReset();
+            // 等一帧让重置完成，再确认准备
+            StartCoroutine(DelayedConfirmPrepare());
+        });
+        IEnumerator DelayedConfirmPrepare()
+        {
+            yield return null;
+            _ctrl?.ConfirmPrepare();
+        }
 
         btnConfirmStep2.onClick.AddListener(() =>
         {

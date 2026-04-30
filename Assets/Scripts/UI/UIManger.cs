@@ -83,6 +83,10 @@ public class UIManager : MonoBehaviour
     {
         ShowPage(4);
     }
+    public void Showtujian()
+    {
+        ShowPage(5);
+    }
 
 
     public void Next()
