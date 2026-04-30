@@ -1071,8 +1071,8 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: f5b1d45d0319f2948ac44b744ec66fa8, type: 3}
-  m_PlayOnAwake: 1
+  m_audioClip: {fileID: 0}
+  m_PlayOnAwake: 0
   m_Volume: 1
   m_Pitch: 1
   Loop: 0
@@ -1366,7 +1366,7 @@ MonoBehaviour:
   trailEndColor: {r: 0, g: 1, b: 1, a: 0}
   autoPlayOnStep3: 1
   playLandingBounce: 0
-  landingSound: {fileID: 0}
+  landingSound: {fileID: 8300000, guid: f5b1d45d0319f2948ac44b744ec66fa8, type: 3}
   soundVolume: 0.6
 --- !u!1 &65702495273564240
 GameObject:
