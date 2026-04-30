@@ -4,57 +4,79 @@ using TMPro;
 
 public class LCOscillation : MonoBehaviour
 {
+    // 物理参数：电感、电容、振荡速度
     [Header("物理参数")]
-    public float inductance = 50f;   // 电感
-    public float capacitance = 100f; // 电容
-    private float omega;             // 振荡角频率
-    private float runTime;           // 运行计时
+    public float inductance = 50f;
+    public float capacitance = 100f;
+    private float omega;
+    private float runTime;
 
+    // 波形显示：速度、粗细、大小
     [Header("波形控制")]
-    [Tooltip("波形动画速度：越小越慢")]
-    public float waveSpeed = 0.0001f;  // 大幅减慢速度
+    public float waveSpeed = 0.000001f;
+    public int waveCycleCount = 1;
+    public float lineWidth = 4f;
+    public float waveMaxHeight = 80f;
 
+    // 变阻器、电压、电流
     [Header("滑动变阻器")]
-    public Slider resistorSlider;    // 变阻器滑块
-    public float rValue = 0.5f;       // 电阻值
-    public float maxVoltage = 10f;    // 最大电压
-    public float maxCurrent = 5f;     // 最大电流
+    public Slider resistorSlider;
+    public float rValue = 0.5f;
+    public float maxVoltage = 10f;
+    public float maxCurrent = 5f;
 
-    [Header("实时电学数据")]
-    public float curVoltage;         // 当前电压
-    public float curCurrent;         // 当前电流
+    // 当前电压、电流
+    [Header("实时数据")]
+    public float curVoltage;
+    public float curCurrent;
 
+    // 实验状态
     [Header("实验状态")]
-    public bool circuitOK = false;    // 电路是否搭建完成
-    private bool powerOn = false;     // 开关是否打开
+    public bool circuitOK = false;
+    private bool powerOn = false;
+    private bool experimentFinished = false; // 实验是否完全结束
 
-    [Header("灯光特效")]
-    public Light magneticLight;       // 磁场灯
+    // 灯光
+    [Header("灯光")]
+    public Light magneticLight;
 
+    // 按钮
     [Header("按钮")]
-    public Button circuitSwitch;      // 电源开关
-    public Button resetBtn;           // 重置按钮
+    public Button circuitSwitch;
+    public Button resetBtn;
 
-    [Header("UI文本显示")]
-    public TextMeshProUGUI tipText;       // 提示文字
-    public TextMeshProUGUI voltageText;   // 电压显示
-    public TextMeshProUGUI currentText;   // 电流显示
-    public TextMeshProUGUI paramText;     // 参数显示
+    // 显示文本
+    [Header("UI文本")]
+    public TextMeshProUGUI tipText;
+    public TextMeshProUGUI voltageText;
+    public TextMeshProUGUI currentText;
+    public TextMeshProUGUI paramText;
 
-    [Header("公式验证模块")]
-    public TMP_InputField formulaInput;   // 公式输入框
-    public Button submitFormulaBtn;       // 提交按钮
-    public TextMeshProUGUI formulaResultText; // 结果显示
-    private readonly string rightFormula = "f=1/(2π√LC)"; // 正确公式
+    // 公式验证
+    [Header("公式验证")]
+    public TMP_InputField formulaInput;
+    public Button submitFormulaBtn;
+    public TextMeshProUGUI formulaResultText;
+    private readonly string rightFormula = "f=1/(2π√LC)";
 
-   
+    private Texture2D bgTexture; // 波形背景
+
+
     void Start()
     {
+        // 初始化
         runTime = 0;
-        CalcOmega(); // 计算振荡频率
+        CalcOmega();
 
-        // 初始状态：关灯、禁用滑块
+        // 创建半透明背景
+        bgTexture = new Texture2D(1, 1);
+        bgTexture.SetPixel(0, 0, new Color(0, 0, 0, 0.6f));
+        bgTexture.Apply();
+
+        // 关闭灯光
         if (magneticLight != null) magneticLight.intensity = 0;
+
+        // 初始化滑块
         if (resistorSlider != null)
         {
             resistorSlider.interactable = false;
@@ -67,83 +89,81 @@ public class LCOscillation : MonoBehaviour
         if (resetBtn != null) resetBtn.onClick.AddListener(ResetAll);
         if (submitFormulaBtn != null) submitFormulaBtn.onClick.AddListener(CheckFormula);
 
-        UpdateUI_Data(); // 更新UI数据
+        UpdateUI_Data();
+        tipText.text = "请先完成电路连接";
     }
 
     void Update()
     {
-        // 只有电路完成+开关打开，才运行波形和特效
+        // 实验运行时，更新时间
         if (circuitOK && powerOn)
         {
-            runTime += Time.deltaTime;
+            runTime += Time.deltaTime * waveSpeed;
             UpdateEffect();
         }
     }
 
-    //=====================================
-    // 绘制波形（屏幕上方 + 缩小 + 减速 + 标注）
-    //=====================================
+    // 绘制波形（电压、电流）
     void OnGUI()
     {
-        // 未开启则不绘制
         if (!circuitOK || !powerOn) return;
 
-        // 波形位置：屏幕上方空白区
-        float centerX = Screen.width / 2;
-        float centerY = Screen.height * 0.22f;
+        float screenW = Screen.width;
+        float waveAreaW = screenW * 0.8f;
+        float waveAreaH = waveMaxHeight * 3f;
+        float waveAreaX = (screenW - waveAreaW) / 2;
+        float waveAreaY = Screen.height * 0.15f;
 
-        // 波形宽度
-        float width = Screen.width * 0.7f;
+        // 画背景
+        GUI.color = new Color(0, 0, 0, 0.6f);
+        GUI.DrawTexture(new Rect(waveAreaX, waveAreaY, waveAreaW, waveAreaH), bgTexture);
 
-        // 波形幅度
-        float height = 22 * rValue;
+        float voltageCenterY = waveAreaY + waveAreaH * 0.25f;
+        float currentCenterY = waveAreaY + waveAreaH * 0.75f;
+        float waveHalfHeight = waveMaxHeight * 0.4f;
 
-        //====================
-        // 绘制电压波形（蓝色）
-        //====================
-        GUI.color = Color.blue;
-        GUI.Label(new Rect(centerX - width / 2 - 70, centerY + height + 5, 100, 25), "电压波形");
-        for (int i = 0; i < width; i += 3)
+        // 画电压波形
+        GUI.color = Color.cyan;
+        GUI.Label(new Rect(waveAreaX - 60, voltageCenterY - 12, 60, 25), "电压");
+        DrawLine(new Vector2(waveAreaX, voltageCenterY), new Vector2(waveAreaX + waveAreaW, voltageCenterY), 1f);
+        for (int i = 0; i < waveAreaW; i += 2)
         {
-            float t = (float)i / width;
-            float y = Mathf.Cos(t * Mathf.PI * 4 + runTime * omega * waveSpeed) * height;
+            float t = (float)i / waveAreaW;
+            float phase = t * Mathf.PI * 2 * waveCycleCount + runTime * omega;
+            float y = Mathf.Cos(phase) * waveHalfHeight;
             DrawLine(
-                new Vector2(centerX - width / 2 + i, centerY + y),
-                new Vector2(centerX - width / 2 + i + 3, centerY + Mathf.Cos((t + 0.01f) * Mathf.PI * 4 + runTime * omega * waveSpeed) * height),
-                2);
+                new Vector2(waveAreaX + i, voltageCenterY + y),
+                new Vector2(waveAreaX + i + 2, voltageCenterY + Mathf.Cos(phase + 0.01f) * waveHalfHeight),
+                lineWidth);
         }
 
-        //====================
-        // 绘制电流波形（绿色）
-        //====================
+        // 画电流波形
         GUI.color = Color.green;
-        GUI.Label(new Rect(centerX - width / 2 - 70, centerY - height - 20, 100, 25), "电流波形");
-        for (int i = 0; i < width; i += 3)
+        GUI.Label(new Rect(waveAreaX - 60, currentCenterY - 12, 60, 25), "电流");
+        DrawLine(new Vector2(waveAreaX, currentCenterY), new Vector2(waveAreaX + waveAreaW, currentCenterY), 1f);
+        for (int i = 0; i < waveAreaW; i += 2)
         {
-            float t = (float)i / width;
-            float y = Mathf.Sin(t * Mathf.PI * 4 + runTime * omega * waveSpeed) * height;
+            float t = (float)i / waveAreaW;
+            float phase = t * Mathf.PI * 2 * waveCycleCount + runTime * omega;
+            float y = Mathf.Sin(phase) * waveHalfHeight;
             DrawLine(
-                new Vector2(centerX - width / 2 + i, centerY - y),
-                new Vector2(centerX - width / 2 + i + 3, centerY - Mathf.Sin((t + 0.01f) * Mathf.PI * 4 + runTime * omega * waveSpeed) * height),
-                2);
+                new Vector2(waveAreaX + i, currentCenterY + y),
+                new Vector2(waveAreaX + i + 2, currentCenterY + Mathf.Sin(phase + 0.01f) * waveHalfHeight),
+                lineWidth);
         }
     }
 
-    //=====================================
-    // 画线工具函数
-    //=====================================
+    // 画线工具
     void DrawLine(Vector2 p1, Vector2 p2, float width)
     {
         float angle = Mathf.Atan2(p2.y - p1.y, p2.x - p1.x) * Mathf.Rad2Deg;
-        float length = Vector2.Distance(p1, p2);
+        float len = Vector2.Distance(p1, p2);
         GUIUtility.RotateAroundPivot(angle, p1);
-        GUI.DrawTexture(new Rect(p1.x, p1.y, length, width), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(p1.x, p1.y - width / 2, len, width), Texture2D.whiteTexture);
         GUIUtility.RotateAroundPivot(-angle, p1);
     }
 
-    //=====================================
-    // 计算LC振荡频率
-    //=====================================
+    // 计算振荡频率
     void CalcOmega()
     {
         float L = inductance * 0.001f;
@@ -151,19 +171,15 @@ public class LCOscillation : MonoBehaviour
         omega = 1f / Mathf.Sqrt(L * C);
     }
 
-    //=====================================
-    // 外部调用：电路搭建完成
-    //=====================================
+    // 电路连接完成
     public void OnCircuitComplete()
     {
         circuitOK = true;
-        if (resistorSlider != null) resistorSlider.interactable = true;
-        if (tipText != null) tipText.text = "电路已连接，请打开开关";
+        resistorSlider.interactable = true;
+        tipText.text = "电路已连接，请打开电源开关";
     }
 
-    //=====================================
-    // 开关点击事件
-    //=====================================
+    // 开关按钮点击
     void SwitchClick()
     {
         if (!circuitOK)
@@ -176,7 +192,7 @@ public class LCOscillation : MonoBehaviour
         runTime = 0;
 
         if (powerOn)
-            tipText.text = "实验运行中";
+            tipText.text = "实验运行中，观察LC振荡波形";
         else
         {
             tipText.text = "实验已暂停";
@@ -184,9 +200,7 @@ public class LCOscillation : MonoBehaviour
         }
     }
 
-    //=====================================
-    // 变阻器数值变化
-    //=====================================
+    // 调节电阻
     void ResistorChange(float val)
     {
         if (!circuitOK) return;
@@ -194,76 +208,82 @@ public class LCOscillation : MonoBehaviour
         UpdateUI_Data();
     }
 
-    //=====================================
-    // 更新电压、电流、参数显示
-    //=====================================
+    // 更新电压、电流显示
     void UpdateUI_Data()
     {
         curVoltage = maxVoltage * rValue;
         curCurrent = maxCurrent * rValue;
-
-        if (voltageText != null) voltageText.text = $"电压：{curVoltage:F2} V";
-        if (currentText != null) currentText.text = $"电流：{curCurrent:F2} A";
-        if (paramText != null) paramText.text = $"L：{inductance} mH\nC：{capacitance} μF";
+        voltageText.text = $"电压：{curVoltage:F2} V";
+        currentText.text = $"电流：{curCurrent:F2} A";
+        paramText.text = $"电感L：{inductance} mH\n电容C：{capacitance} μF";
     }
 
-    //=====================================
     // 更新灯光亮度
-    //=====================================
     void UpdateEffect()
     {
         if (magneticLight != null)
             magneticLight.intensity = curCurrent * 1.2f;
     }
 
-    //=====================================
     // 关闭灯光
-    //=====================================
     void CloseEffect()
     {
         if (magneticLight != null) magneticLight.intensity = 0;
     }
 
-    //=====================================
-    // 重置实验全部状态
-    //=====================================
+    // 重置实验
     void ResetAll()
     {
         powerOn = false;
         circuitOK = false;
+        experimentFinished = false;
         runTime = 0;
         rValue = 0.5f;
 
-        if (resistorSlider != null)
-        {
-            resistorSlider.value = 0.5f;
-            resistorSlider.interactable = false;
-        }
+        resistorSlider.value = 0.5f;
+        resistorSlider.interactable = false;
 
         CloseEffect();
         UpdateUI_Data();
-        tipText.text = "请重新连接电路";
+        tipText.text = "实验已重置，请重新连接电路";
+
+        formulaResultText.text = "";
+        formulaInput.text = "";
     }
 
-    //=====================================
-    // 公式验证逻辑
-    //=====================================
+    // 检查公式是否正确
     void CheckFormula()
     {
-        if (formulaInput == null || formulaResultText == null) return;
-
         string input = formulaInput.text.Trim().Replace(" ", "");
         string right = rightFormula.Replace(" ", "");
 
         if (input == right)
         {
-            formulaResultText.text = "✅ 回答正确！";
+            formulaResultText.text = "✅ 答案正确";
             formulaResultText.color = Color.green;
+
+            // ==============================
+            // 实验完全结束 → 调用AI
+            // ==============================
+            experimentFinished = true;
+            CallAIAfterExperimentComplete();
         }
         else
         {
-            formulaResultText.text = "❌ 错误！正确公式：f=1/(2π√LC)";
+            formulaResultText.text = "❌ 答案错误，正确公式：f=1/(2π√LC)";
             formulaResultText.color = Color.red;
         }
+    }
+
+    // ======================================
+    // 【AI 接口】
+    // 只有实验全部完成才会运行这里
+    // 以后直接在这里写AI代码
+    // ======================================
+    void CallAIAfterExperimentComplete()
+    {
+        experimentFinished = true;
+        tipText.text = "🎉 实验全部完成！正在调用AI分析...";
+        Debug.Log("实验已结束，准备调用AI"); // 这里用到它了
     }
 }
