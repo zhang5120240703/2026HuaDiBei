@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections;
-using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -8,241 +7,139 @@ using UnityEngine.Networking;
 public class PythonCommunication : MonoBehaviour
 {
     private const string DefaultRequestUrl = "http://127.0.0.1:5000/unity";
-    private const string ActionConfirmPara = "ConfirmPara";
-    //private const string ActionJumpToNextState = "JumpToNextState";
-    private const string ActionChooseExp = "ChooseExp";
-    private const string ActionStartFirstExp = "StartFirstExp";
-    private const string ActionStartSecondExp = "StartSecondExp";
-    private const string ActionEnterSummary = "EnterSummary";
-    private const string ActionNoAction = "NoAction";
-    private const string StepStartProgram = "StartProgram";
-    private const string StepRunFirstExp = "RunFirstExp";
-    private const string StepRunSecondExp = "RunSecondExp";
-    private const string StepFinishSummary = "FinishSummary";
-    private const string StepCompleted = "Completed";
 
-    [Header("Request")]
+    [Header("Python 服务地址")]
     [SerializeField] private string requestUrl = DefaultRequestUrl;
-    [SerializeField] private string currentStepMsg = "StartProgram";
-    [SerializeField] private bool isValid;
-    [SerializeField] private State gameState = State.MainMenu;
 
-    [Header("Debug")]
-    [SerializeField] private bool sendOnStart = true;
+    // 外部脚本订阅：收到 AI 响应后自行处理
+    public event Action<AgentResponse> OnResponseReceived;
+    // 外部脚本订阅：请求发送失败时处理错误
+    public event Action<string> OnRequestFailed;
 
+    // 防止同一时间重复发送多个请求
     private bool _isRequestInFlight;
 
-    // 组件启动时执行；如果开启了自动发送，就在开始阶段向 Python 发起一次请求。
-    private void Start()
+    // 发送普通消息给 AI，例如实验场景中的实时问答
+    public void SendChatMessage(string message, string experimentName = "", string extraContext = "")
     {
-        if (string.IsNullOrWhiteSpace(currentStepMsg))
+        if (string.IsNullOrWhiteSpace(message))
         {
-            currentStepMsg = GetDefaultStepForState(gameState);
+            Debug.LogWarning("发送给 AI 的消息为空。", this);
+            OnRequestFailed?.Invoke("发送给 AI 的消息为空。");
+            return;
         }
 
-        if (sendOnStart)
+        AgentRequest requestBody = new AgentRequest
         {
-            SendMessageToPython();
-        }
+            requestType = AgentRequestType.Message,
+            experimentName = experimentName ?? string.Empty,
+            content = message,
+            summaryContext = string.Empty,
+            extraContext = extraContext ?? string.Empty,
+            metadataJson = string.Empty,
+        };
+
+        SendRequest(requestBody);
     }
 
-    // 使用当前 Inspector 面板中的配置直接发送一次测试请求。
-    [ContextMenu("Send Test Request")]
-    public void SendMessageToPython()
+    // 请求 AI 生成实验总结
+    public void RequestExperimentSummary(
+        string experimentName,
+        string summaryContext,
+        string extraContext = "",
+        string metadataJson = "")
     {
-        TrySendRequest();
-    }
-
-    // 外部可传入新的步骤描述；如果 message 非空，会先更新 currentStepMsg 再发送请求。
-    public void SendMessageToPython(string message)
-    {
-        if (!string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(summaryContext))
         {
-            currentStepMsg = message;
+            Debug.LogWarning("实验总结内容为空。", this);
+            OnRequestFailed?.Invoke("实验总结内容为空。");
+            return;
         }
 
-        TrySendRequest();
+        AgentRequest requestBody = new AgentRequest
+        {
+            requestType = AgentRequestType.Summary,
+            experimentName = experimentName ?? string.Empty,
+            content = string.Empty,
+            summaryContext = summaryContext,
+            extraContext = extraContext ?? string.Empty,
+            metadataJson = metadataJson ?? string.Empty,
+        };
+
+        SendRequest(requestBody);
     }
 
-    [ContextMenu("Reset Step For Current State")]
-    public void ResetStepForCurrentState()
+    // 通用发送入口：以后新增 guidance、qa、report 等类型时，直接从外部组装 AgentRequest 即可
+    public void SendRequest(AgentRequest requestBody)
     {
-        currentStepMsg = GetDefaultStepForState(gameState);
-    }
+        if (requestBody == null)
+        {
+            Debug.LogWarning("请求体为空。", this);
+            OnRequestFailed?.Invoke("请求体为空。");
+            return;
+        }
 
-    // 请求发送前的保护入口；如果已有请求在进行中，则拒绝重复发送。
-    private void TrySendRequest()
-    {
         if (_isRequestInFlight)
         {
-            Debug.LogWarning("已有请求在进行中，已拒绝新的请求", this);
+            Debug.LogWarning("已有请求正在进行中", this);
+            OnRequestFailed?.Invoke("已有请求正在进行中");
             return;
         }
 
-        StartCoroutine(PostRequest());
-    }
+        NormalizeRequest(requestBody);
 
-    //构建发送的json消息
-    private AgentRequest BuildRequest()
-    {
-        string currentStep = GetCurrentStep();
-
-        return new AgentRequest
+        string validationError = ValidateRequest(requestBody);
+        if (!string.IsNullOrEmpty(validationError))
         {
-            currentStep = currentStep,
-            runState = gameState.ToString(),
-            isParamValid = isValid,
-            availableActions = GetAvailableActions(currentStep)
-        };
-    }
-
-    private string GetCurrentStep()
-    {
-        if (string.IsNullOrWhiteSpace(currentStepMsg))
-        {
-            currentStepMsg = GetDefaultStepForState(gameState);
-        }
-
-        return currentStepMsg;
-    }
-
-    private string GetDefaultStepForState(State state)
-    {
-        //根据 state 的不同，返回不同的值
-        return state switch
-        {
-            State.MainMenu => StepStartProgram,
-            State.FirstExp => StepRunFirstExp,
-            State.SecondExp => StepRunSecondExp,
-            State.Summary => StepFinishSummary,
-            _ => StepStartProgram
-        };
-    }
-
-    // 根据当前状态和参数是否合法，动态生成本次请求允许执行的动作白名单。
-    private string[] GetAvailableActions(string currentStep)
-    {
-        if (!isValid)
-        {
-            return Array.Empty<string>();
-        }
-
-        return (gameState, currentStep) switch
-        {
-            (State.MainMenu, StepStartProgram) => new[] { ActionChooseExp },
-            (State.FirstExp, StepRunFirstExp) => new[] { ActionStartFirstExp },
-            (State.SecondExp, StepRunSecondExp) => new[] { ActionStartSecondExp },
-            (State.Summary, StepFinishSummary) => new[] { ActionEnterSummary },
-            (State.Summary, StepCompleted) => Array.Empty<string>(),
-            _ => Array.Empty<string>()
-        };
-    }
-
-    //根据返回的action执行对应的功能
-    private void HandleAgentAction(AgentResponse response)
-    {
-        switch (response.action)
-        {
-            case ActionConfirmPara:
-                Debug.Log("执行操作：确认参数", this);
-                break;
-            /*case ActionJumpToNextState:
-                Debug.Log("Execute action: JumpToNextState", this);
-                break;*/
-            case ActionChooseExp:
-                Debug.Log("执行操作：选择实验", this);
-                break;
-            case ActionStartFirstExp:
-                Debug.Log("执行操作：开始第一个实验", this);
-                break;
-            case ActionStartSecondExp:
-                Debug.Log("E执行操作：开始第二个实验", this);
-                break;
-            case ActionEnterSummary:
-                Debug.Log("执行操作：进入总结环节", this);
-                break;
-            case ActionNoAction:
-                Debug.Log("请求失败，无动作", this);
-                return;
-            default:
-                Debug.LogWarning("Unknown action: " + response.action, this);
-                return;
-        }
-
-        if (!ApplyNextState(response.nextState))
-        {
+            Debug.LogWarning(validationError, this);
+            OnRequestFailed?.Invoke(validationError);
             return;
         }
 
-        ApplyNextStep(response.nextStep);
+        StartCoroutine(PostRequest(requestBody));
     }
 
-    // 将 Python 返回的 nextState 字符串解析为本地枚举，并在合法时更新当前状态。
-    private bool ApplyNextState(string nextState)
+    // 统一整理请求字段，避免外部脚本传入 null
+    private void NormalizeRequest(AgentRequest requestBody)
     {
-        if (string.IsNullOrWhiteSpace(nextState))
-        {
-            return true;
-        }
-
-        if (!Enum.TryParse(nextState, out State parsedState))
-        {
-            Debug.LogWarning("Unknown nextState: " + nextState, this);
-            return false;
-        }
-
-        if (gameState != parsedState)
-        {
-            Debug.Log($"State change: {gameState} -> {parsedState}", this);
-            gameState = parsedState;
-        }
-
-        return true;
+        requestBody.requestType = (requestBody.requestType ?? string.Empty).Trim().ToLowerInvariant();
+        requestBody.experimentName = requestBody.experimentName ?? string.Empty;
+        requestBody.content = requestBody.content ?? string.Empty;
+        requestBody.summaryContext = requestBody.summaryContext ?? string.Empty;
+        requestBody.extraContext = requestBody.extraContext ?? string.Empty;
+        requestBody.metadataJson = requestBody.metadataJson ?? string.Empty;
     }
 
-    private void ApplyNextStep(string nextStep)
+    // 当前只启用 message 和 summary 两类请求，其余类型先预留
+    private string ValidateRequest(AgentRequest requestBody)
     {
-        if (string.IsNullOrWhiteSpace(nextStep))
+        if (string.IsNullOrWhiteSpace(requestBody.requestType))
         {
-            return;
+            return "请求类型为空。";
         }
 
-        if (currentStepMsg != nextStep)
+        if (requestBody.requestType == AgentRequestType.Message &&
+            string.IsNullOrWhiteSpace(requestBody.content))
         {
-            Debug.Log($"Step change: {currentStepMsg} -> {nextStep}", this);
-            currentStepMsg = nextStep;
+            return "普通消息内容为空。";
         }
+
+        if (requestBody.requestType == AgentRequestType.Summary &&
+            string.IsNullOrWhiteSpace(requestBody.summaryContext))
+        {
+            return "实验总结内容为空。";
+        }
+
+        return null;
     }
 
-    // 检查返回的 action 是否属于本次请求允许的动作，避免执行越界操作。
-    private bool IsActionAllowed(string action, string[] allowedActions)
-    {
-        if (action == ActionNoAction)
-        {
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(action) || allowedActions == null)
-        {
-            return false;
-        }
-
-
-        if (allowedActions.Contains(action))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    // 负责完整的通信流程：构造请求、发送给 Python、解析响应、校验动作并执行。
-    private IEnumerator PostRequest()
+    // 完整通信流程：序列化请求、发送到 Python、解析响应并抛出事件
+    private IEnumerator PostRequest(AgentRequest requestBody)
     {
         _isRequestInFlight = true;
+
         try
         {
-            AgentRequest requestBody = BuildRequest();
             string json = JsonUtility.ToJson(requestBody);
             byte[] postData = Encoding.UTF8.GetBytes(json);
 
@@ -252,7 +149,6 @@ public class PythonCommunication : MonoBehaviour
             {
                 request.uploadHandler = new UploadHandlerRaw(postData);
                 request.downloadHandler = new DownloadHandlerBuffer();
-                //通知python按照JSON解析
                 request.SetRequestHeader("Content-Type", "application/json");
 
                 yield return request.SendWebRequest();
@@ -264,21 +160,20 @@ public class PythonCommunication : MonoBehaviour
 
                     if (response == null)
                     {
-                        Debug.LogWarning("Python返回了一个空JSON信息", this);
-                    }
-                    else if (!IsActionAllowed(response.action, requestBody.availableActions))
-                    {
-                        Debug.LogWarning("拒绝执行操作： " + response.action, this);
+                        Debug.LogWarning("Python 返回了一个空 JSON 响应。", this);
+                        OnRequestFailed?.Invoke("Python 返回了一个空 JSON 响应。");
                     }
                     else
                     {
-                        Debug.Log("Python回复：" + response.reply, this);
-                        HandleAgentAction(response);
+                        NormalizeResponse(response);
+                        Debug.Log("Python 回复：" + response.reply, this);
+                        OnResponseReceived?.Invoke(response);
                     }
                 }
                 else
                 {
-                    Debug.LogError("Python链接错误：" + request.error, this);
+                    Debug.LogError("Python 连接错误：" + request.error, this);
+                    OnRequestFailed?.Invoke(request.error);
                 }
             }
         }
@@ -287,22 +182,72 @@ public class PythonCommunication : MonoBehaviour
             _isRequestInFlight = false;
         }
     }
+
+    // 统一整理响应字段，给外部脚本一个稳定的数据结构
+    private void NormalizeResponse(AgentResponse response)
+    {
+        response.responseType = response.responseType ?? string.Empty;
+        response.reply = response.reply ?? string.Empty;
+        response.suggestion = response.suggestion ?? string.Empty;
+        response.extraDataJson = response.extraDataJson ?? string.Empty;
+    }
+}
+
+// 请求类型常量：
+// 当前已启用 message、summary；
+// guidance、qa、report 等类型先预留，后面加功能时直接复用这套协议。
+public static class AgentRequestType
+{
+    public const string Message = "message";
+    public const string Summary = "summary";
+
+    // 预留扩展类型
+    public const string Guidance = "guidance";
+    public const string Qa = "qa";
+    public const string Report = "report";
+}
+
+// 响应类型常量：
+// 当前已启用 message、summary、error；
+// 以后如果加 guidance、qa，也建议沿用同样命名。
+public static class AgentResponseType
+{
+    public const string Message = "message";
+    public const string Summary = "summary";
+    public const string Error = "error";
+
+    // 预留扩展类型
+    public const string Guidance = "guidance";
+    public const string Qa = "qa";
+    public const string Report = "report";
 }
 
 [Serializable]
 public class AgentRequest
 {
-    public string currentStep;
-    public string runState;
-    public bool isParamValid;
-    public string[] availableActions;
+    // 请求类型：当前使用 message 或 summary
+    public string requestType;
+    // 实验名称，例如“单摆实验”
+    public string experimentName;
+    // 普通消息内容，例如学生提问
+    public string content;
+    // 实验总结所需的上下文文本
+    public string summaryContext;
+    // 预留扩展字段：补充说明、阶段说明、问题背景等
+    public string extraContext;
+    // 预留扩展字段：结构化 JSON 文本，后面可放实验数据、学生记录等
+    public string metadataJson;
 }
 
 [Serializable]
 public class AgentResponse
 {
-    public string action;
-    public string nextState;
-    public string nextStep;
+    // 响应类型：message、summary、error，后面可扩展 guidance、qa
+    public string responseType;
+    // AI 返回的主文本内容
     public string reply;
+    // 预留扩展字段：建议语句、下一步提示等
+    public string suggestion;
+    // 预留扩展字段：结构化 JSON 文本，后面可放评分、标签、摘要等
+    public string extraDataJson;
 }
