@@ -56,10 +56,11 @@ public static class SimulationDataBuffer
     public static LaunchParamSnapshot LastLaunchParams { get; private set; }
 
     /// <summary>
-    /// 小球在世界坐标 X 轴方向的位移（取绝对值，单位：米）。
-    /// 由轨迹起点和终点计算：|end.x - start.x|
+    /// 小球在水平面（XZ 平面）上的位移（取绝对值，单位：米）。
+    /// 由轨迹起点和终点计算：sqrt((end.x-start.x)² + (end.z-start.z)²)
+    /// 支持任意水平发射方向，不再固定为 X 轴。
     /// </summary>
-    public static float XDistance { get; private set; }
+    public static float HorizontalDistance { get; private set; }
 
     /// <summary>
     /// 小球在世界坐标 Y 轴方向的位移（取绝对值，单位：米）。
@@ -94,7 +95,7 @@ public static class SimulationDataBuffer
             CurrentTrajectoryPoints = new List<Vector3>();
             RelativeTrajectoryPoints = null;
             LocalOrigin = Vector3.zero;
-            XDistance = 0f;
+            HorizontalDistance = 0f;
             YDistance = 0f;
             TotalDistance = 0f;
             return;
@@ -107,7 +108,9 @@ public static class SimulationDataBuffer
         var start = newPoints[0];
         var end = newPoints[newPoints.Count - 1];
 
-        XDistance = Mathf.Abs(end.x - start.x);
+        float hDx = end.x - start.x;
+        float hDz = end.z - start.z;
+        HorizontalDistance = Mathf.Sqrt(hDx * hDx + hDz * hDz);
         YDistance = Mathf.Abs(end.y - start.y);
 
         // 性能优化：手动展开距离计算，避免Vector3.Distance
@@ -135,7 +138,7 @@ public static class SimulationDataBuffer
         Debug.Log($"[SimulationDataBuffer] 三维轨迹数据已更新，" +
                   $"共 {CurrentTrajectoryPoints.Count} 个点。 " +
                   $"起点={start}  终点={end} " +
-                  $"XDistance={XDistance:F3}m  YDistance={YDistance:F3}m  TotalDistance={TotalDistance:F3}m\n" +
+                  $"HorizontalDistance={HorizontalDistance:F3}m  YDistance={YDistance:F3}m  TotalDistance={TotalDistance:F3}m\n" +
                   $"[SimulationDataBuffer] 相对坐标已生成（原点={LocalOrigin}）：" +
                   $"首点={RelativeTrajectoryPoints[0]}  " +
                   $"末点={RelativeTrajectoryPoints[RelativeTrajectoryPoints.Count - 1]}");
@@ -154,13 +157,25 @@ public static class SimulationDataBuffer
         RelativeTrajectoryPoints = null;
         LocalOrigin = Vector3.zero;
         LastLaunchParams = default;
-        XDistance = 0f;
+        HorizontalDistance = 0f;
         YDistance = 0f;
         TotalDistance = 0f;
         Debug.Log("[SimulationDataBuffer] 三维轨迹数据已清空（实验重置）。");
     }
 
     // ── 便捷查询方法 ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// 调试用：打印当前缓冲区状态快照
+    /// </summary>
+    public static void LogCurrentState()
+    {
+        Debug.Log($"[SimulationDataBuffer] 当前状态: " +
+                  $"HasValidData={HasValidData()}, " +
+                  $"PointCount={TrajectoryPointCount}, " +
+                  $"LocalOrigin={LocalOrigin}, " +
+                  $"HorizontalDistance={HorizontalDistance:F3}, YDistance={YDistance:F3}, TotalDistance={TotalDistance:F3}");
+    }
 
     /// <summary>
     /// 判断当前是否存在有效轨迹数据。

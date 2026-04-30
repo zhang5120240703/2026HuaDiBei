@@ -118,18 +118,23 @@ public class ProjectileBallController : MonoBehaviour
     /// </summary>
     private IEnumerator LateBindFrameworkEvents()
     {
-        // 等待一帧，确保 ExperimentCoreEntry.Start() 已执行完毕
         yield return null;
 
         if (UserActionManager.Instance != null)
         {
             _flowController = UserActionManager.Instance.GetFlowController();
 
-            // 监听步骤变化
-            _flowController.OnStepChanged += OnStepChanged;
-
-            // 监听流程错误（可选：用于调试）
-            _flowController.OnFlowError += OnFlowError;
+            if (_flowController == null)
+            {
+                Debug.LogError("[ProjectileBallController] GetFlowController() 返回 null！" +
+                               "请检查 UserActionManager 是否正确持有 FlowController 引用。");
+            }
+            else
+            {
+                _flowController.OnStepChanged += OnStepChanged;
+                _flowController.OnFlowError += OnFlowError;
+                Debug.Log("[ProjectileBallController] 事件绑定成功。");
+            }
         }
         else
         {
@@ -139,12 +144,12 @@ public class ProjectileBallController : MonoBehaviour
 
         if (_stateManager != null)
         {
-            // 监听运行状态变化
             _stateManager.OnRunStateChanged += OnRunStateChanged;
+            Debug.Log($"[ProjectileBallController] 状态绑定成功，当前 RunState={_stateManager.CurrentRunState}");
         }
         else
         {
-            Debug.LogWarning("[ProjectileBallController] 未找到 ExperimentStateManager 实例。");
+            Debug.LogError("[ProjectileBallController] ExperimentStateManager.Instance 为 null！");
         }
     }
 
@@ -490,14 +495,13 @@ public class ProjectileBallController : MonoBehaviour
     {
         Debug.Log("[ProjectileBallController] 抛体动画播放完毕。");
 
-        PlayLandingSound(); // 音效新增：落地时触发音效
+        PlayLandingSound();
 
         if (playLandingBounce)
             StartCoroutine(LandingBounceEffect());
 
-        // 通知框架：实验完成（由小球动画结束驱动 Finish 状态）
         if (_stateManager != null &&
-            _stateManager.CurrentRunState == ExperimentRunState.Running)
+            _stateManager.CurrentRunState != ExperimentRunState.Idle)
         {
             _stateManager.FinishExperiment();
         }

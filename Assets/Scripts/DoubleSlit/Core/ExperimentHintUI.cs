@@ -65,7 +65,7 @@ public class ExperimentHintUI : MonoBehaviour
     private CanvasGroup _hintCG;
     private ValidationResult _lastResult;
 
-    private static readonly string[] s_Names = { "光源", "单缝", "双缝", "光屏" };
+    private static readonly string[] s_Names = { "光源", "透镜", "单缝", "双缝", "光屏" };
 
     // 坐标面板更新节流（0.06s 刷新一次，不必每帧）
     private float _coordUpdateTimer;
@@ -138,7 +138,8 @@ public class ExperimentHintUI : MonoBehaviour
         bool anyDragging = false;
         ExperimentItem dragItem = null;
         foreach (var field in new[] { benchManager.lightSource, benchManager.singleSlit,
-                                      benchManager.doubleSlit,  benchManager.screen })
+                                      benchManager.doubleSlit, benchManager.lens,
+                                      benchManager.screen })
         {
             if (field != null && field.isDragging) { anyDragging = true; dragItem = field; break; }
         }
@@ -185,7 +186,8 @@ public class ExperimentHintUI : MonoBehaviour
         bool dragging = false;
         if (benchManager != null)
             foreach (var item in new[] { benchManager.lightSource, benchManager.singleSlit,
-                                         benchManager.doubleSlit,  benchManager.screen })
+                                         benchManager.doubleSlit, benchManager.lens,
+                                         benchManager.screen })
                 if (item != null && item.isDragging) { dragging = true; break; }
 
         if (!dragging) { dragModeText.text = ""; return; }
@@ -266,9 +268,10 @@ public class ExperimentHintUI : MonoBehaviour
                 : string.Join("\n", r.errors);
 
         // 步骤图标
-        ExperimentItem[] items = { benchManager?.lightSource, benchManager?.singleSlit,
-                                   benchManager?.doubleSlit,  benchManager?.screen };
-        for (int i = 0; i < 4; i++)
+        ExperimentItem[] items = { benchManager?.lightSource, benchManager?.lens,
+                                   benchManager?.singleSlit,  benchManager?.doubleSlit,
+                                   benchManager?.screen };
+        for (int i = 0; i < 5; i++)
             SetStepStatus(i, ok ? StepStatus.Complete
                 : (r.IsItemInError(items[i]?.displayName ?? "") ? StepStatus.Error : StepStatus.Complete));
     }
@@ -277,7 +280,7 @@ public class ExperimentHintUI : MonoBehaviour
     //  事件回调
     // ══════════════════════════════════════════════
 
-    private void OnCorrect() { for (int i = 0; i < 4; i++) SetStepStatus(i, StepStatus.Complete); }
+    private void OnCorrect() { for (int i = 0; i < 5; i++) SetStepStatus(i, StepStatus.Complete); }
     private void OnIncorrect() { if (_lastResult != null) ShowResultPanel(_lastResult); }
 
     // ══════════════════════════════════════════════

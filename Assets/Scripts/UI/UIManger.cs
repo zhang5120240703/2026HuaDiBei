@@ -4,13 +4,13 @@ using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
 {
+    
     public static UIManager instance;
 
-    // 顺序拖入：UI0、UI1、UI2、UI4、UI5
     public GameObject[] uiPages;
 
     private int currentPage = 0;
-    private string selectedScene; // 记录你选的实验场景
+    private string selectedScene;
 
     void Awake()
     {
@@ -20,7 +20,19 @@ public class UIManager : MonoBehaviour
     void Start()
     {
         HideAll();
-        ShowPage(0);
+
+        var dataMgr = ExperimentDataManager.Instance;
+        var lastRecord = dataMgr != null ? dataMgr.GetLastRecord() : null;
+        bool hasCompleteResult = lastRecord != null;
+
+        if (hasCompleteResult)
+        {
+            ShowPage(3);
+        }
+        else
+        {
+            ShowPage(0);
+        }
     }
 
     void HideAll()
@@ -32,35 +44,56 @@ public class UIManager : MonoBehaviour
     {
         HideAll();
         currentPage = index;
-        uiPages[index].SetActive(true);
+        if (index >= 0 && index < uiPages.Length && uiPages[index] != null)
+            uiPages[index].SetActive(true);
     }
 
-    // UI1 选择实验后调用：记录场景名，并跳到预览 UI2
-    public void SelectExperiment(string sceneName)
+    private string selectedExperimentDisplayName; // SO 中的显示名称
+
+    public void SelectExperiment(string sceneName, string displayName = null)
     {
         selectedScene = sceneName;
-        ShowPage(1); // 跳到 UI2（预览）
+        if (!string.IsNullOrEmpty(displayName))
+            selectedExperimentDisplayName = displayName;
+        ShowPage(1);
     }
 
-    // UI2 点开始实验：跳去对应场景
     public void StartExperiment()
     {
+        if (ExperimentResultBridge.Instance != null)
+        {
+            ExperimentResultBridge.Instance.Clear();
+            ExperimentResultBridge.Instance.experimentName = selectedScene;
+            ExperimentResultBridge.Instance.startTime = Time.time;
+            ExperimentResultBridge.Instance.experimentDisplayName = selectedExperimentDisplayName;
+        }
+
         StartCoroutine(LoadToScene());
-        //SceneManager.LoadScene(selectedScene);
     }
 
-    // 从实验场景回来 → 显示总结 UI4
     public void ShowSummary()
     {
-        ShowPage(2); // UI4
+        ShowPage(3);
+    }
+    public void ShowStart()
+    {
+        ShowPage(0);
+    }
+    public void Show4()
+    {
+        ShowPage(4);
+    }
+    public void Showtujian()
+    {
+        ShowPage(5);
     }
 
-    // 下一页
+
     public void Next()
     {
-        if (currentPage == 3) // UI5 结束
+        if (currentPage == 3)
         {
-            ShowPage(0); // 回到开始
+            ShowPage(0);
         }
         else
         {
@@ -68,7 +101,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // 返回
     public void Back()
     {
         ShowPage(currentPage - 1);
@@ -78,5 +110,4 @@ public class UIManager : MonoBehaviour
     {
         yield return SceneManager.LoadSceneAsync(selectedScene);
     }
-
 }

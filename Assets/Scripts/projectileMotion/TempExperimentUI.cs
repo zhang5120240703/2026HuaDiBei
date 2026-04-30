@@ -175,13 +175,13 @@ public class TempExperimentUI : MonoBehaviour
         AddLog($"🎯 仿真完成：{pts.Count} 个轨迹点");
     }
 
-    private void OnObserveData(float xD, float yD, float total, int count)
+    private void OnObserveData(float hD, float yD, float total, int count)
     {
-        _observeText = $"X 位移：{xD:F2} m\n" +
+        _observeText = $"水平位移：{hD:F2} m\n" +
                        $"Y 位移：{yD:F2} m\n" +
                        $"总路程：{total:F2} m\n" +
                        $"轨迹点：{count}";
-        AddLog($"📊 观测数据：X={xD:F2}m  Y={yD:F2}m  总路程={total:F2}m");
+        AddLog($"📊 观测数据：水平={hD:F2}m  Y={yD:F2}m  总路程={total:F2}m");
     }
 
     private void OnPaused()

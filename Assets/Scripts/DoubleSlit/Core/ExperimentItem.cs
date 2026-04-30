@@ -7,7 +7,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class ExperimentItem : MonoBehaviour
 {
-    public enum ApparatusType { LightSource = 0, SingleSlit = 1, DoubleSlit = 2, Screen = 3 }
+    public enum ApparatusType { LightSource = 0, SingleSlit = 1, DoubleSlit = 2, Screen = 3, Lens = 4 }
 
     // ══════════════════════════════════════════════
     //  Inspector
@@ -18,10 +18,10 @@ public class ExperimentItem : MonoBehaviour
     public string displayName = "器材";
 
     [Header("视觉反馈颜色")]
-    public Color draggingColor = new Color(1f, 0.85f, 0f);
-    public Color snapHintColor = new Color(0f, 1f, 0.5f);
-    public Color correctColor = new Color(0.2f, 1f, 0.2f);
-    public Color errorColor = new Color(1f, 0.25f, 0.25f);
+    public Color draggingColor = new(1f, 0.85f, 0f);
+    public Color snapHintColor = new(0f, 1f, 0.5f);
+    public Color correctColor = new(0.2f, 1f, 0.2f);
+    public Color errorColor = new(1f, 0.25f, 0.25f);
 
     [Header("渲染器（留空自动收集子节点）")]
     public Renderer[] targetRenderers;
@@ -135,7 +135,7 @@ public class ExperimentItem : MonoBehaviour
         if (heightGuideLine == null || !isDragging) return;
 
         Vector3 top = transform.position;
-        Vector3 bottom = new Vector3(top.x, opticalAxisY, top.z);
+        Vector3 bottom = new(top.x, opticalAxisY, top.z);
         heightGuideLine.SetPosition(0, top);
         heightGuideLine.SetPosition(1, bottom);
 
